@@ -5,10 +5,63 @@
 // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
 
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider = "prisma-client-js"
+  // output   = "../generated/prisma"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "sqlserver"
+
+}
+
+
+model User {
+  id           String   @id @default(uuid()) @db.UniqueIdentifier
+  firstName    String   @db.VarChar(100)
+  lastName     String   @db.VarChar(100)
+  userName     String?  @unique @db.VarChar(50)
+  emailAddress String   @unique @db.VarChar(255)
+  password String   @map("password") @db.VarChar(255) 
+  avatarUrl    String?  @db.NVarChar(Max)
+  createdAt    DateTime @default(now()) @db.DateTimeOffset
+  updatedAt    DateTime @default(now()) @db.DateTimeOffset
+  
+  // password reset functionality
+  passwordResetToken      String?   @map("password_reset_token") @db.VarChar(255)
+  passwordResetExpires    DateTime? @map("password_reset_expires") @db.DateTimeOffset
+  
+  // email verification
+  emailVerified           Boolean   @default(false) @map("email_verified")
+  emailVerificationToken  String?   @map("email_verification_token") @db.VarChar(255)
+  emailVerificationExpires DateTime? @map("email_verification_expires") @db.DateTimeOffset
+  
+  // Track last password change for security
+  lastPasswordChange      DateTime  @default(now()) @map("last_password_change") @db.DateTimeOffset
+  
+  notes Note[]
+  
+  @@map("Users")
+  @@index([emailAddress])
+  @@index([userName])
+  @@index([lastName, firstName])
+  @@index([passwordResetToken])
+  @@index([emailVerificationToken])
+}
+
+model Note {
+  id        String   @id @default(uuid()) @db.UniqueIdentifier
+  title     String   @db.NVarChar(255)
+  content   String   @db.NVarChar(Max)
+  synopsis  String?  @db.NVarChar(500) 
+  isDeleted Boolean  @default(false) @map("is_deleted")
+  deletedAt DateTime? @map("deleted_at") @db.DateTimeOffset
+  createdAt DateTime @default(now()) @map("created_at") @db.DateTimeOffset
+  updatedAt DateTime @default(now()) @map("updated_at") @db.DateTimeOffset
+  
+  userId   String   @map("user_id") @db.UniqueIdentifier
+  user     User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@map("Notes")
+  @@index([userId])
+  @@index([isDeleted, deletedAt])
 }
