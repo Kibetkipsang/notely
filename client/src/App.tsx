@@ -1,4 +1,7 @@
-import { useState } from 'react'
+import {Routes, Route} from 'react-router-dom'
+import { Header } from './components/Header'
+import Auth from './components/Auth'
+import Landing from './components/Home'
 
 import './App.css'
 
@@ -7,7 +10,11 @@ function App() {
 
   return (
     <>
-    <div>notely</div>
+    <Header/>
+    <Routes>
+      <Route path='/' element={<Landing />}/>
+      <Route path='/auth' element={<Auth />}/>
+    </Routes>
     </>
   )
 }

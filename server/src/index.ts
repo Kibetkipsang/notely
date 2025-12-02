@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
-import cors from 'cors';    
+import cors from 'cors';   
+import { login, register } from './controllers/auth'; 
 
 dotenv.config()
 const app = express();
@@ -33,6 +34,17 @@ app.use(
     exposedHeaders: ["Set-Cookie", "Cookie"],
   }),
 );
+
+
+try{
+
+  // auth routes
+  app.post("/auth/register", register)
+  app.post("/auth/login", login)
+
+}catch(err){
+  console.log(err, "Something went wrong.")
+}
 
 const port = 5000;
 app.listen(port, () => {
