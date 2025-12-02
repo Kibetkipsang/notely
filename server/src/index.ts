@@ -3,6 +3,19 @@ import dotenv from 'dotenv';
 import cors from 'cors';
 import cookieParser from 'cookie-parser'
 import { login, register, logout } from './controllers/auth'; 
+import {
+  createNote,
+  getNote,
+  getAllNotes,
+  updateNote,
+  softDeleteNote,
+  getDeletedNotes,
+  restoreNote,
+  deleteNotePermanently,
+  emptyTrash,
+  searchNotes,
+  getNoteStats,
+} from '../src/controllers/notes';
 
 dotenv.config();
 
@@ -24,9 +37,24 @@ app.use(cors({
 }));
 
 // Routes
+
+// Auth routes
 app.post('/auth/register', register);
 app.post('/auth/login', login);
 app.post('/auth/logout', logout);
+
+// Notes routes - FIXED: Consistent naming
+app.post('/notes/create', createNote); 
+app.get('/notes/stats', getNoteStats);
+app.get('/notes/search', searchNotes);
+app.get('/notes/trash', getDeletedNotes);
+app.delete('/notes/trash/empty', emptyTrash); 
+app.post('/notes/:id/restore', restoreNote);
+app.get('/notes/:id', getNote);
+app.put('/notes/:id', updateNote); 
+app.patch('/notes/:id/soft-delete', softDeleteNote); 
+app.delete('/notes/:id', deleteNotePermanently);
+app.get('/notes', getAllNotes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -37,10 +65,20 @@ app.get('/health', (req, res) => {
   });
 });
 
+// 404 handler - ADD THIS
+app.use('*', (req, res) => {
+  res.status(404).json({
+    success: false,
+    message: 'Route not found',
+    path: req.originalUrl
+  });
+});
+
 // Error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Server error:', err);
   res.status(500).json({
+    success: false,
     message: 'Internal server error',
     error: process.env.NODE_ENV === 'development' ? err.message : undefined
   });
@@ -49,7 +87,7 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📡 API: http://localhost:${PORT}/api`);
+  console.log(`📡 API: http://localhost:${PORT}`);
   console.log(`🩺 Health: http://localhost:${PORT}/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
 });
