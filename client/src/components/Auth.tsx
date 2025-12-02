@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { api } from '../axios'; // Make sure this path is correct
+import { api } from '../axios';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import useAuthStore from '../stores/useAuthStore';
@@ -15,7 +15,7 @@ type UserDataType = {
   firstName: string;
   lastName: string;
   userName: string;
-  emailAddress: string; // Fixed typo
+  emailAddress: string;
   password: string;
 };
 
@@ -48,7 +48,9 @@ export default function Auth() {
   const [lastName, setLastName] = useState('');
   const [userName, setUserName] = useState('');
   const [emailAddress, setEmailAddress] = useState('');
-  const [registerPassword, setRegisterPassword] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   // Register mutation
   const registerMutation = useMutation({
@@ -58,11 +60,14 @@ export default function Auth() {
       toast.success("Signup successful!");
       setActiveTab('signin');
       setLoginIdentifier(emailAddress);
+      // Clear form
       setFirstName('');
       setLastName('');
       setUserName('');
       setEmailAddress('');
-      setRegisterPassword('');
+      setPassword('');
+      setConfirmPassword('');
+      setPasswordError('');
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || "Registration failed");
@@ -76,9 +81,7 @@ export default function Auth() {
     onSuccess: (data) => {
       if (data.success) {
         toast.success("Login successful!");
-    
         setUser(data.user);
-    
         navigate('/dashboard');
       } else {
         toast.error(data.message || "Login failed");
@@ -92,13 +95,20 @@ export default function Auth() {
   // Handle register
   const handleRegister = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    setPasswordError('');
     
-    if (!firstName || !lastName || !emailAddress || !registerPassword) {
+    // Validation
+    if (!firstName || !lastName || !emailAddress || !password || !confirmPassword) {
       return toast.error("All fields are required");
     }
     
-    if (registerPassword.length < 6) {
+    if (password.length < 6) {
       return toast.error("Password must be at least 6 characters");
+    }
+    
+    if (password !== confirmPassword) {
+      setPasswordError("Passwords do not match");
+      return toast.error("Passwords do not match");
     }
 
     const userData: UserDataType = {
@@ -106,7 +116,7 @@ export default function Auth() {
       lastName,
       userName: userName || `${firstName.toLowerCase()}${lastName.toLowerCase()}`,
       emailAddress,
-      password: registerPassword,
+      password, // Use password, not registerPassword
     };
 
     registerMutation.mutate(userData);
@@ -128,8 +138,7 @@ export default function Auth() {
     loginMutation.mutate(loginData);
   };
 
-
-  const {user} = useAuthStore();
+  const { user } = useAuthStore();
   if (user) {
     navigate('/dashboard');
     return null;
@@ -139,11 +148,6 @@ export default function Auth() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-orange-50 p-4">
       <div className="w-full max-w-md space-y-8">
         <div className="text-center space-y-4">
-          {/* <div className="flex justify-center mb-4">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-r from-orange-500 to-orange-600 shadow-lg">
-              <PenLine className="h-8 w-8 text-white" />
-            </div>
-          </div> */}
           <h1 className="font-bold text-4xl bg-gradient-to-r from-orange-500 to-orange-600 bg-clip-text text-transparent">
             Welcome to Notely
           </h1>
@@ -165,6 +169,7 @@ export default function Auth() {
               </TabsList>
             </CardHeader>
 
+            {/* Login Form */}
             <TabsContent value="signin">
               <form onSubmit={handleLogin}>
                 <CardContent className="space-y-4">
@@ -272,36 +277,44 @@ export default function Auth() {
                   </div>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="registerPassword">Password</Label>
+                    <Label htmlFor="password">Password</Label>
                     <Input
-                      id="registerPassword"
+                      id="password"
                       type="password"
                       placeholder="••••••••"
-                      value={registerPassword}
-                      onChange={(e) => setRegisterPassword(e.target.value)}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
                       required
                       disabled={registerMutation.isPending}
-                      className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                      className={`border-gray-300 focus:border-orange-500 focus:ring-orange-500 ${
+                        passwordError ? 'border-red-500' : ''
+                      }`}
                     />
                     <p className="text-xs text-gray-500">
                       Must be at least 6 characters long
                     </p>
                   </div>
+                  
                   <div className="space-y-2">
-                    <Label htmlFor="registerPassword">Confirm Password</Label>
+                    <Label htmlFor="confirmPassword">Confirm Password</Label>
                     <Input
-                      id="registerPassword"
+                      id="confirmPassword"
                       type="password"
                       placeholder="••••••••"
-                      value={registerPassword}
-                      onChange={(e) => setRegisterPassword(e.target.value)}
+                      value={confirmPassword}
+                      onChange={(e) => {
+                        setConfirmPassword(e.target.value);
+                        if (passwordError) setPasswordError('');
+                      }}
                       required
                       disabled={registerMutation.isPending}
-                      className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                      className={`border-gray-300 focus:border-orange-500 focus:ring-orange-500 ${
+                        passwordError ? 'border-red-500' : ''
+                      }`}
                     />
-                    <p className="text-xs text-gray-500">
-                      Must be at least 6 characters long
-                    </p>
+                    {passwordError && (
+                      <p className="text-xs text-red-500">{passwordError}</p>
+                    )}
                   </div>
                   
                   <Button
@@ -322,6 +335,8 @@ export default function Auth() {
               </form>
             </TabsContent>
           </Tabs>
+          
+          
         </Card>
       </div>
     </div>

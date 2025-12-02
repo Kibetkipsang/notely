@@ -3,7 +3,7 @@ import { Header } from './components/Header'
 import Auth from './components/Auth'
 import Landing from './components/Home'
 
-import './App.css'
+import './index.css'
 
 function App() {
  
