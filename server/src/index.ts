@@ -1,6 +1,7 @@
 import express from 'express';
 import dotenv from 'dotenv';
 import cors from 'cors';
+import cookieParser from 'cookie-parser'
 import { login, register, logout } from './controllers/auth'; 
 
 dotenv.config();
@@ -11,6 +12,7 @@ const PORT = process.env.PORT || 5000;
 // Middleware
 app.use(express.json()); 
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser());
 
 // CORS configuration
 app.use(cors({
