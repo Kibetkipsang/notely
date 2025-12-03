@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { api } from '../axios';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import useAuthStore from '../stores/useAuthStore';
+
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -38,7 +39,7 @@ const loginUser = async (data: LoginDataType) => {
 
 export default function Auth() {
   const navigate = useNavigate();
-  const { setUser } = useAuthStore();
+  const { setUser, user } = useAuthStore();
   
   // Form states
   const [activeTab, setActiveTab] = useState<'signin' | 'signup'>('signin');
@@ -51,7 +52,16 @@ export default function Auth() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
-
+  
+  useEffect(() => {
+    const token = localStorage.getItem('token');
+    console.log('Auth check:', { user, hasToken: !!token });
+    
+    if (user && token) {
+      console.log('User authenticated, redirecting...');
+      navigate('/dashboard');
+    }
+  }, [user, navigate]);
   // Register mutation
   const registerMutation = useMutation({
     mutationKey: ["register"],
@@ -75,23 +85,41 @@ export default function Auth() {
   });
 
   // Login mutation
-  const loginMutation = useMutation({
-    mutationKey: ["login"],
-    mutationFn: loginUser,
-    onSuccess: (data) => {
-      if (data.success) {
-        toast.success("Login successful!");
-        setUser(data.user);
-        navigate('/dashboard');
+  // Update your login mutation to debug the response
+const loginMutation = useMutation({
+  mutationKey: ["login"],
+  mutationFn: loginUser,
+  onSuccess: (data) => {
+    console.log('🎯 LOGIN RESPONSE:', data); // Debug the actual response
+    
+    // Check different possible response structures
+    if (data.success || data.token || data.accessToken) {
+      toast.success("Login successful!");
+      
+      // Try different possible response structures
+      const user = data.user || data.data?.user;
+      const token = data.token || data.accessToken || data.data?.token;
+      
+      console.log('Extracted:', { user, token });
+      
+      if (user && token) {
+        setUser(user);
+        // ✅ CRITICAL: Store the token
+        localStorage.setItem('token', token);
+        console.log('Token stored in localStorage');
       } else {
-        toast.error(data.message || "Login failed");
+        console.error('Missing user or token:', data);
+        toast.error('Login succeeded but missing token');
       }
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || "Login failed");
-    },
-  });
-
+    } else {
+      toast.error(data.message || "Login failed");
+    }
+  },
+  onError: (error: any) => {
+    console.error('Login error:', error);
+    toast.error(error?.response?.data?.message || "Login failed");
+  },
+});
   // Handle register
   const handleRegister = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -138,11 +166,7 @@ export default function Auth() {
     loginMutation.mutate(loginData);
   };
 
-  const { user } = useAuthStore();
-  if (user) {
-    navigate('/dashboard');
-    return null;
-  }
+ 
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-orange-50 p-4">

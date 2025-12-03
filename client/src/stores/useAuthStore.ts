@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { persist } from 'zustand/middleware'; // Add this import
 
 type UserType = {
   id: string;
@@ -11,29 +12,35 @@ type UserType = {
 
 type AuthStore = {
   user: UserType | null;
-  setUser: (user: UserType) => void;
+  token: string | null;
+  setUser: (user: UserType, token?: string) => void;
   clearUser: () => void;
 };
 
-const useAuthStore = create<AuthStore>((set) => ({
-  user:
-    typeof window !== "undefined"
-      ? JSON.parse(localStorage.getItem("user") || "null")
-      : null,
-
-  setUser: (user) => {
-    set({ user });
-    if (typeof window !== "undefined") {
-      localStorage.setItem("user", JSON.stringify(user));
+const useAuthStore = create<AuthStore>()(
+  persist(
+    (set) => ({
+      user: null,
+      token: null,
+      
+      setUser: (user, token) => {
+        set({ user });
+        if (token) {
+          set({ token });
+          // Also store token in localStorage for axios interceptor
+          localStorage.setItem('token', token);
+        }
+      },
+      
+      clearUser: () => {
+        set({ user: null, token: null });
+        localStorage.removeItem('token');
+      },
+    }),
+    {
+      name: 'auth-storage',
     }
-  },
-
-  clearUser: () => {
-    set({ user: null });
-    if (typeof window !== "undefined") {
-      localStorage.removeItem("user");
-    }
-  },
-}));
+  )
+);
 
 export default useAuthStore;

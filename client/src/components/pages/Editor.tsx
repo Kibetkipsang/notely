@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../../axios';
 import useAuthStore from '../../stores/useAuthStore';
-import { useNotes } from '../../stores/useNotes'; 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,52 +11,115 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Save, ArrowLeft, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
+// Define types locally
+type NoteFormData = {
+  title: string;
+  content: string;
+  synopsis?: string;
+};
+
+type NoteType = {
+  id: string;
+  title: string;
+  content: string;
+  synopsis?: string;
+  createdAt: string;
+  updatedAt: string;
+  isDeleted: boolean;
+  userId: string;
+};
+
 export default function Editor() {
-  const { id } = useParams();
+  const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user } = useAuthStore();
-  const { notes, createNote, updateNote, getNoteById } = useNotes(); 
+  const queryClient = useQueryClient();
+  const isEditMode = !!id;
   
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [synopsis, setSynopsis] = useState('');
-  const [saving, setSaving] = useState(false);
-  const [loading, setLoading] = useState(false);
+  const [shouldRedirect, setShouldRedirect] = useState(false);
 
-  const isEditMode = !!id;
-
+  // Check authentication and redirect if needed
   useEffect(() => {
     if (!user) {
       navigate('/auth');
-      return;
     }
+  }, [user, navigate]);
 
-    // If editing, fetch the note
-    if (isEditMode && id) {
-      const fetchNote = async () => {
-        setLoading(true);
-        try {
-          // Use getNoteById from useNotes hook
-          const note = getNoteById(id);
-          if (note) {
-            setTitle(note.title);
-            setContent(note.content);
-            setSynopsis(note.synopsis || '');
-          } else {
-            toast.error('Note not found');
-            navigate('/dashboard');
-          }
-        } catch (error) {
-          console.error('Error fetching note:', error);
-          toast.error('Failed to load note');
-          navigate('/dashboard');
-        } finally {
-          setLoading(false);
-        }
-      };
-      fetchNote();
+  // Fetch note if in edit mode
+  const { data: noteData, isLoading: isLoadingNote, error: fetchError } = useQuery({
+    queryKey: ['note', id],
+    queryFn: async () => {
+      if (!id) return null;
+      const response = await api.get(`/notes/${id}`);
+      return response.data.data as NoteType;
+    },
+    enabled: isEditMode && !!id && !!user, // Only fetch if editing and user is authenticated
+    retry: false,
+  });
+
+  // Handle fetch errors (e.g., note not found)
+  useEffect(() => {
+    if (fetchError) {
+      console.error('Error fetching note:', fetchError);
+      toast.error('Failed to load note');
+      setShouldRedirect(true);
     }
-  }, [user, navigate, id, isEditMode]);
+  }, [fetchError]);
+
+  // Redirect after error
+  useEffect(() => {
+    if (shouldRedirect) {
+      const timer = setTimeout(() => {
+        navigate('/dashboard');
+      }, 1500);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldRedirect, navigate]);
+
+  // Update form when note data loads
+  useEffect(() => {
+    if (noteData) {
+      setTitle(noteData.title);
+      setContent(noteData.content);
+      setSynopsis(noteData.synopsis || '');
+    }
+  }, [noteData]);
+
+  // Create note mutation
+  const createNoteMutation = useMutation({
+    mutationFn: async (noteData: NoteFormData) => {
+      const response = await api.post('/notes/create', noteData);
+      return response.data.data;
+    },
+    onSuccess: () => {
+      toast.success('Note created successfully!');
+      queryClient.invalidateQueries({ queryKey: ['notes'] });
+      navigate('/dashboard');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to create note');
+    },
+  });
+
+  // Update note mutation
+  const updateNoteMutation = useMutation({
+    mutationFn: async ({ id, noteData }: { id: string; noteData: NoteFormData }) => {
+      const response = await api.put(`/notes/${id}`, noteData);
+      return response.data.data;
+    },
+    onSuccess: (data) => {
+      toast.success('Note updated successfully!');
+      queryClient.invalidateQueries({ queryKey: ['notes'] });
+      queryClient.setQueryData(['note', id], data);
+      navigate('/dashboard');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to update note');
+    },
+  });
 
   const handleSave = async () => {
     if (!title.trim()) {
@@ -68,31 +132,16 @@ export default function Editor() {
       return;
     }
 
-    setSaving(true);
+    const noteData: NoteFormData = {
+      title: title.trim(),
+      content: content.trim(),
+      synopsis: synopsis.trim() || undefined,
+    };
 
-    try {
-      if (isEditMode && id) {
-        await updateNote(id, {
-          title: title.trim(),
-          content: content.trim(),
-          synopsis: synopsis.trim() || undefined,
-        });
-        toast.success('Note updated successfully!');
-        navigate('/dashboard');
-      } else {
-        await createNote({
-          title: title.trim(),
-          content: content.trim(),
-          synopsis: synopsis.trim() || undefined,
-        });
-        toast.success('Note created successfully!');
-        navigate('/dashboard');
-      }
-    } catch (error: any) {
-      console.error('Error saving note:', error);
-      toast.error(error?.message || 'Failed to save note');
-    } finally {
-      setSaving(false);
+    if (isEditMode && id) {
+      updateNoteMutation.mutate({ id, noteData });
+    } else {
+      createNoteMutation.mutate(noteData);
     }
   };
 
@@ -100,7 +149,29 @@ export default function Editor() {
     navigate('/dashboard');
   };
 
-  if (loading) {
+  const isSaving = createNoteMutation.isPending || updateNoteMutation.isPending;
+
+  // Show loading state
+  if (isEditMode && isLoadingNote) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  // Show redirect message if needed
+  if (shouldRedirect) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <p className="text-gray-600">Redirecting to dashboard...</p>
+      </div>
+    );
+  }
+
+  // Check if user is still loading (to prevent premature redirect)
+  if (!user) {
     return (
       <div className="min-h-screen bg-white flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -116,16 +187,17 @@ export default function Editor() {
             variant="outline"
             onClick={handleBack}
             className="gap-2 border-orange-400 text-gray-700"
+            disabled={isSaving}
           >
             <ArrowLeft className="h-4 w-4" />
             Back to Notes
           </Button>
           <Button
             onClick={handleSave}
-            disabled={saving}
+            disabled={isSaving}
             className="bg-gradient-primary hover:opacity-90 text-white font-medium shadow-soft hover:shadow-medium transition-all"
           >
-            {saving ? (
+            {isSaving ? (
               <>
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 Saving...
@@ -149,9 +221,9 @@ export default function Editor() {
                 id="title"
                 placeholder="Enter note title..."
                 value={title}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTitle(e.target.value)}
+                onChange={(e) => setTitle(e.target.value)}
                 className="text-lg font-medium border-gray-300 focus:border-orange-500 focus:ring-orange-500"
-                disabled={saving}
+                disabled={isSaving}
               />
             </div>
 
@@ -163,10 +235,10 @@ export default function Editor() {
                 id="synopsis"
                 placeholder="Brief summary of your note..."
                 value={synopsis}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setSynopsis(e.target.value)}
+                onChange={(e) => setSynopsis(e.target.value)}
                 rows={2}
                 className="border-gray-300 focus:border-orange-500 focus:ring-orange-500 resize-none"
-                disabled={saving}
+                disabled={isSaving}
               />
             </div>
 
@@ -178,10 +250,10 @@ export default function Editor() {
                 id="content"
                 placeholder="Write your note content here..."
                 value={content}
-                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setContent(e.target.value)}
+                onChange={(e) => setContent(e.target.value)}
                 rows={16}
                 className="border-gray-300 focus:border-orange-500 focus:ring-orange-500 font-sans text-sm"
-                disabled={saving}
+                disabled={isSaving}
               />
               <p className="text-xs text-gray-500">
                 Tip: Keep your notes organized and focused.
@@ -195,17 +267,17 @@ export default function Editor() {
           <Button
             variant="outline"
             onClick={handleBack}
-            disabled={saving}
+            disabled={isSaving}
             className="border-gray-300 text-gray-700"
           >
             Cancel
           </Button>
           <Button
             onClick={handleSave}
-            disabled={saving}
+            disabled={isSaving}
             className="bg-gradient-primary hover:opacity-90 text-white"
           >
-            {saving ? 'Saving...' : 'Save Note'}
+            {isSaving ? 'Saving...' : 'Save Note'}
           </Button>
         </div>
       </main>

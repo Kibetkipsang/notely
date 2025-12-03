@@ -39,85 +39,80 @@ export const register = async (req:Request, res: Response): Promise<Response | v
     }
 }
 
-export const login = async (req: Request, res: Response) => {
-    try{
-        const {identifier, password} = req.body
-        
-        console.log('=== LOGIN START ===');
-        console.log('Login attempt for:', identifier);
-        
-        // find user with the identifier
-        const user = await client.user.findFirst({
-            where: {
-                OR: [{userName: identifier}, {emailAddress: identifier}]
-            }
-        })
-        console.log('User found:', user?.emailAddress);
+export const login = async (req: Request, res: Response): Promise<Response | void> => {
+  try {
+    const { identifier, password } = req.body;
 
-        if(!user){
-            return res.status(400).json({
-                success: false,
-                message: "Wrong Login Credentials."
-            });
-        }
+    console.log('=== LOGIN START ===');
+    console.log('Login attempt for:', identifier);
 
-        // compare password
-        const passMatch = await bcrypt.compare(password, user.password)
-        if(!passMatch){
-            return res.status(400).json({
-                message: "Wrong Login Credentials."
-            })
-        }
+    // Find user by username or email
+    const user = await client.user.findFirst({
+      where: {
+        OR: [{ userName: identifier }, { emailAddress: identifier }]
+      }
+    });
 
-        const payload = {
-            id: user.id,
-            firstName: user.firstName,
-            lastName: user.lastName,
-            userName: user.userName,
-            emailAddress: user.emailAddress
-        }
-
-        // generate tokens and save it as a cookie
-        const token = jwt.sign(payload, process.env.SECRET_KEY!, {
-            expiresIn: "2h"
-        });
-
-        console.log('=== COOKIE SETTINGS ===');
-        console.log('Token generated (first 20 chars):', token.substring(0, 20) + '...');
-        console.log('Cookie settings:', {
-            httpOnly: true,
-            secure: false,
-            sameSite: 'lax',
-            maxAge: '2 hours',
-            path: '/'
-        });
-
-        res.cookie("authToken", token, {
-            httpOnly: true,
-            secure: false,
-            sameSite: "lax",
-            maxAge: 2 * 60 * 60 * 1000,
-            path: "/",
-        });
-
-        console.log('Cookie set in response');
-        
-        res.status(200).json({
-            success: true,
-            message: "Login successful",
-            user: payload,
-            token: token,
-        });
-
-        console.log('=== LOGIN COMPLETE ===');
-
-    }catch(err){
-        console.error('Login error:', err);
-        res.status(500).json({
-            message: "Something went wrong. Please try again later."
-        })
+    if (!user) {
+      console.log('User not found');
+      return res.status(400).json({
+        success: false,
+        message: 'Wrong Login Credentials.'
+      });
     }
-}
+
+    // Compare password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      console.log('Password mismatch');
+      return res.status(400).json({
+        success: false,
+        message: 'Wrong Login Credentials.'
+      });
+    }
+
+    // Payload for JWT
+    const payload = {
+      id: user.id,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      userName: user.userName,
+      emailAddress: user.emailAddress
+    };
+
+    // Sign JWT
+    const token = jwt.sign(payload, process.env.SECRET_KEY!, { expiresIn: '2h' });
+
+    console.log('Token generated (first 20 chars):', token.substring(0, 20) + '...');
+
+    // Set cookie with proper settings for localhost
+    res.cookie('authToken', token, {
+      httpOnly: true,
+      secure: false,         
+      sameSite: 'lax',        
+      maxAge: 2 * 60 * 60 * 1000,
+      path: '/'
+    });
+
+    console.log('Cookie set in response');
+
+    // Respond with payload
+    res.status(200).json({
+      success: true,
+      message: 'Login successful',
+      user: payload,
+      token
+    });
+
+    console.log('=== LOGIN COMPLETE ===');
+  } catch (err) {
+    console.error('Login error:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Something went wrong. Please try again later.'
+    });
+  }
+};
 
 export const logout = async (_req: Request, res: Response) => {
   try {

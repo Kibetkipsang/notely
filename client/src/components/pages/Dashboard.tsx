@@ -1,72 +1,108 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../stores/useAuthStore';
-import { useNotes } from '../../stores/useNotes'; 
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { api } from '../../axios'; // or your API client
 import NoteCard from './NoteCard';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2 } from 'lucide-react';
+import { Plus, Loader2, Trash2 } from 'lucide-react';
+import { toast } from 'sonner'; // or your toast library
+
+// Define types
+type NoteType = {
+  id: string;
+  title: string;
+  content: string;
+  synopsis?: string;
+  createdAt: Date;
+  updatedAt: Date;
+  isDeleted: boolean;
+  userId: string;
+};
+
+type NoteFilterType = {
+  page?: number;
+  limit?: number;
+  search?: string;
+  includeDeleted?: boolean;
+};
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
+  const queryClient = useQueryClient();
 
+  // React Query for fetching notes
   const {
-    notes,
-    loading,
+    data: notesData,
+    isLoading,
+    isError,
     error,
-    getAllNotes,
-    softDeleteNote,
-    refreshNotes,
-    clearError,
-  } = useNotes();
+    refetch,
+  } = useQuery({
+    queryKey: ['notes', { page: 1, limit: 10 }],
+    queryFn: async () => {
+      const response = await api.get('/notes', {
+        params: { page: 1, limit: 10 }
+      });
+      return response.data;
+    },
+    enabled: !!user, // Only fetch when user exists
+  });
 
+  // Mutation for soft deleting a note
+  const deleteNoteMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const response = await api.patch(`/notes/${id}/soft-delete`);
+      return response.data;
+    },
+    onSuccess: () => {
+      // Invalidate and refetch notes
+      queryClient.invalidateQueries({ queryKey: ['notes'] });
+      toast.success('Note moved to trash');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to delete note');
+    },
+  });
+
+  // Redirect if not authenticated
   useEffect(() => {
     if (!user) {
       navigate('/auth');
-    } else {
-      getAllNotes({ page: 1, limit: 10 });
     }
   }, [user, navigate]);
 
-  // FIXED: Properly filter active notes
-  const activeNotes = notes.filter((note) => {
-    // Check both naming conventions
-    if (note.isDeleted !== undefined) return !note.isDeleted;
-    if (note.isDeleted !== undefined) return !note.isDeleted;
-    return true; // If property doesn't exist, assume it's active
-  });
+  // Extract notes from response
+  const notes = notesData?.data || [];
+  const pagination = notesData?.pagination;
 
-  // Handle error display if needed
-  useEffect(() => {
-    if (error) {
-      console.error('Notes error:', error);
-    }
-  }, [error]);
+  // Filter active notes
+  const activeNotes = notes.filter((note: NoteType) => !note.isDeleted);
 
+  // Handlers
   const handleCreateNote = () => {
     navigate('/notes/create');
   };
 
   const handleRefresh = () => {
-    refreshNotes({ page: 1, limit: 10 });
+    refetch();
   };
 
-  const handleDeleteNote = async (id: string) => {
-    await softDeleteNote(id);
-  };
-
-  // Debug: Add this to see what's happening
-  useEffect(() => {
-    if (notes.length > 0) {
-      console.log('First note properties:', {
-        id: notes[0].id,
-        title: notes[0].title,
-        isDeleted: notes[0].isDeleted,
-        is_deleted: notes[0].isDeleted,
-        content: notes[0].content?.substring(0, 50) + '...',
-      });
+  const handleDeleteNote = (id: string) => {
+    if (window.confirm('Are you sure you want to move this note to trash?')) {
+      deleteNoteMutation.mutate(id);
     }
-  }, [notes, loading, error]);
+  };
+
+  // If loading and no data yet
+  if (isLoading && !notesData) {
+    return (
+      <div className="min-h-screen bg-white flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-white">
@@ -80,14 +116,14 @@ export default function Dashboard() {
               <p className="text-muted-foreground">
                 {activeNotes.length} {activeNotes.length === 1 ? 'note' : 'notes'}
               </p>
-              {error && (
+              {isError && (
                 <div className="text-red-500 text-sm">
-                  {error}
+                  {error?.message || 'Failed to load notes'}
                   <button 
-                    onClick={clearError}
+                    onClick={() => refetch()}
                     className="ml-2 text-xs underline"
                   >
-                    Dismiss
+                    Retry
                   </button>
                 </div>
               )}
@@ -97,10 +133,10 @@ export default function Dashboard() {
             <Button
               variant="outline"
               onClick={handleRefresh}
-              disabled={loading}
+              disabled={isLoading}
               className="font-medium bg-gradient-subtle border border-orange-400 text-gray-700"
             >
-              {loading ? (
+              {isLoading ? (
                 <Loader2 className="h-4 w-4 animate-spin mr-2" />
               ) : null}
               Refresh
@@ -116,7 +152,7 @@ export default function Dashboard() {
           </div>
         </div>
 
-        {loading && notes.length === 0 ? (
+        {isLoading && notes.length === 0 ? (
           <div className="flex items-center justify-center py-20">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
@@ -142,7 +178,7 @@ export default function Dashboard() {
           </div>
         ) : (
           <>
-            {loading && notes.length > 0 && (
+            {isLoading && notes.length > 0 && (
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="h-6 w-6 animate-spin text-primary mr-2" />
                 <span className="text-muted-foreground">Updating...</span>
@@ -150,16 +186,40 @@ export default function Dashboard() {
             )}
             
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {activeNotes.map((note) => (
+              {activeNotes.map((note: NoteType) => (
                 <NoteCard
                   key={note.id}
                   note={note}
                   onDelete={() => handleDeleteNote(note.id)}
                   onEdit={() => navigate(`/edit/${note.id}`)}
                   onView={() => navigate(`/notes/${note.id}`)}
+                  isDeleting={deleteNoteMutation.isPending && deleteNoteMutation.variables === note.id}
                 />
               ))}
             </div>
+
+            {/* Pagination (if needed) */}
+            {pagination && pagination.pages > 1 && (
+              <div className="flex justify-center mt-8">
+                <Button
+                  variant="outline"
+                  onClick={() => refetch()}
+                  disabled={pagination.page === 1}
+                >
+                  Previous
+                </Button>
+                <span className="mx-4 flex items-center">
+                  Page {pagination.page} of {pagination.pages}
+                </span>
+                <Button
+                  variant="outline"
+                  onClick={() => refetch()}
+                  disabled={!pagination.hasNextPage}
+                >
+                  Next
+                </Button>
+              </div>
+            )}
           </>
         )}
       </main>

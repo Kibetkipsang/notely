@@ -123,7 +123,7 @@ export const getNote = async (req: Request, res: Response): Promise<void>  => {
 };
 
 // Get All Notes (with pagination)
-export const getAllNotes = async (req: Request, res: Response) => {
+export const getAllNotes = async (req: Request, res: Response): Promise<void> => {
   try {
     const userId = req.user?.id;
     
@@ -136,10 +136,11 @@ export const getAllNotes = async (req: Request, res: Response) => {
     
     if (!userId) {
       console.log('ERROR: No user ID found in request');
-      return res.status(401).json({ 
+      res.status(401).json({ 
         success: false,
         error: 'Unauthorized - No user ID found' 
       });
+      return;
     }
     
     const page = parseInt(req.query.page as string) || 1;

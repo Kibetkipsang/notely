@@ -4,6 +4,7 @@ import Auth from './components/Auth'
 import Landing from './components/Home'
 import Dashboard from './components/pages/Dashboard'
 import Editor from './components/pages/Editor'
+import NoteView from './components/pages/NoteView'
 
 import './index.css'
 
@@ -18,6 +19,7 @@ function App() {
       <Route path='/auth' element={<Auth />}/>
       <Route path='/dashboard' element={<Dashboard />}/>
       <Route path='/notes/create' element={<Editor />}/>
+      <Route path='/notes/:id' element={<NoteView />}/>
     </Routes>
     </>
   )
