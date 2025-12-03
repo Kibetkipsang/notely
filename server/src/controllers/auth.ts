@@ -42,13 +42,17 @@ export const register = async (req:Request, res: Response): Promise<Response | v
 export const login = async (req: Request, res: Response) => {
     try{
         const {identifier, password} = req.body
+        
+        console.log('=== LOGIN START ===');
+        console.log('Login attempt for:', identifier);
+        
         // find user with the identifier
         const user = await client.user.findFirst({
             where: {
                 OR: [{userName: identifier}, {emailAddress: identifier}]
             }
         })
-        console.log(user)
+        console.log('User found:', user?.emailAddress);
 
         if(!user){
             return res.status(400).json({
@@ -78,23 +82,37 @@ export const login = async (req: Request, res: Response) => {
             expiresIn: "2h"
         });
 
-        res.cookie("authToken", token, {
-      httpOnly: true, // Prevents client-side JS from reading the cookie
-      secure: process.env.NODE_ENV === "production", // false for localhost
-      sameSite: "lax", // Allows cross-origin requests
-      maxAge: 2 * 60 * 60 * 1000, // 2 hours in milliseconds
-      path: "/", // Available to all routes
-      // domain: "localhost" // Optional: explicitly set domain
-    });
+        console.log('=== COOKIE SETTINGS ===');
+        console.log('Token generated (first 20 chars):', token.substring(0, 20) + '...');
+        console.log('Cookie settings:', {
+            httpOnly: true,
+            secure: false,
+            sameSite: 'lax',
+            maxAge: '2 hours',
+            path: '/'
+        });
 
-    res.status(200).json({
-      success: true,
-      message: "Login successful",
-      user: payload,
-      token: token, // Also send token in response body
-    });
+        res.cookie("authToken", token, {
+            httpOnly: true,
+            secure: false,
+            sameSite: "lax",
+            maxAge: 2 * 60 * 60 * 1000,
+            path: "/",
+        });
+
+        console.log('Cookie set in response');
+        
+        res.status(200).json({
+            success: true,
+            message: "Login successful",
+            user: payload,
+            token: token,
+        });
+
+        console.log('=== LOGIN COMPLETE ===');
 
     }catch(err){
+        console.error('Login error:', err);
         res.status(500).json({
             message: "Something went wrong. Please try again later."
         })

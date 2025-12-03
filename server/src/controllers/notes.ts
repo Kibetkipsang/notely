@@ -126,6 +126,22 @@ export const getNote = async (req: Request, res: Response): Promise<void>  => {
 export const getAllNotes = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
+    
+    // ADD THESE DEBUG LOGS
+    console.log('=== BACKEND: GET ALL NOTES ===');
+    console.log('Request user:', req.user);
+    console.log('User ID from req.user?.id:', userId);
+    console.log('Request cookies:', req.cookies);
+    console.log('Request headers:', req.headers);
+    
+    if (!userId) {
+      console.log('ERROR: No user ID found in request');
+      return res.status(401).json({ 
+        success: false,
+        error: 'Unauthorized - No user ID found' 
+      });
+    }
+    
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 10;
     const search = req.query.search as string;
@@ -136,6 +152,8 @@ export const getAllNotes = async (req: Request, res: Response) => {
       userId,
       isDeleted: false,
     };
+    
+    console.log('Prisma where clause:', JSON.stringify(whereClause, null, 2));
 
     // Add search functionality
     if (search) {
@@ -150,6 +168,8 @@ export const getAllNotes = async (req: Request, res: Response) => {
     const total = await prisma.note.count({
       where: whereClause,
     });
+    
+    console.log('Total notes found in DB:', total);
 
     // Get notes
     const notes = await prisma.note.findMany({
@@ -168,6 +188,11 @@ export const getAllNotes = async (req: Request, res: Response) => {
       skip,
       take: limit,
     });
+    
+    console.log('Notes retrieved:', notes.length);
+    if (notes.length > 0) {
+      console.log('First note:', notes[0]);
+    }
 
     res.status(200).json({
       success: true,
@@ -181,6 +206,9 @@ export const getAllNotes = async (req: Request, res: Response) => {
         hasPreviousPage: page > 1,
       },
     });
+    
+    console.log('Response sent successfully');
+    
   } catch (error) {
     console.error('Get all notes error:', error);
     res.status(500).json({

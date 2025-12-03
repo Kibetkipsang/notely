@@ -16,6 +16,7 @@ import {
   searchNotes,
   getNoteStats,
 } from '../src/controllers/notes';
+import { authenticate } from './middlewares/checkUser'
 
 dotenv.config();
 
@@ -28,13 +29,14 @@ app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
 
 // CORS configuration
-app.use(cors({
-  origin: ['http://localhost:5173', 'http://127.0.0.1:5173'],
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'Cookie', 'Set-Cookie'],
-  exposedHeaders: ['Set-Cookie']
-}));
+app.use(
+  cors({
+    origin: ["http://localhost:5173", "http://127.0.0.1:5173"],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS']
+  })
+);
+
 
 // Routes
 
@@ -44,17 +46,17 @@ app.post('/auth/login', login);
 app.post('/auth/logout', logout);
 
 // Notes routes - FIXED: Consistent naming
-app.post('/notes/create', createNote); 
-app.get('/notes/stats', getNoteStats);
-app.get('/notes/search', searchNotes);
-app.get('/notes/trash', getDeletedNotes);
-app.delete('/notes/trash/empty', emptyTrash); 
-app.post('/notes/:id/restore', restoreNote);
-app.get('/notes/:id', getNote);
-app.put('/notes/:id', updateNote); 
-app.patch('/notes/:id/soft-delete', softDeleteNote); 
-app.delete('/notes/:id', deleteNotePermanently);
-app.get('/notes', getAllNotes);
+app.post('/notes/create', authenticate, createNote); 
+app.get('/notes/stats', authenticate, getNoteStats);
+app.get('/notes/search', authenticate, searchNotes);
+app.get('/notes/trash', authenticate, getDeletedNotes);
+app.delete('/notes/trash/empty', authenticate, emptyTrash); 
+app.post('/notes/:id/restore', authenticate, restoreNote);
+app.get('/notes/:id', authenticate, getNote);
+app.put('/notes/:id', authenticate, updateNote); 
+app.patch('/notes/:id/soft-delete', authenticate, softDeleteNote); 
+app.delete('/notes/:id', authenticate, deleteNotePermanently);
+app.get('/notes', authenticate, getAllNotes);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
