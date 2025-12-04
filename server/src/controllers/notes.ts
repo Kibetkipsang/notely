@@ -1,6 +1,7 @@
 // controllers/notes.controller.ts
 import { type Request, type Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { ActivityService, ActivityData } from '../services/activity.service';
 
 // Extend Express Request type to include 'user'
 declare global {
@@ -22,10 +23,13 @@ const prisma = new PrismaClient();
 // Create Note
 export const createNote = async (req: Request, res: Response): Promise<void> => {
   try {
-    
     const { title, content, synopsis } = req.body;
-    const userId = req.user?.id; 
-   
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
 
     // Create note
     const note = await prisma.note.create({
@@ -53,6 +57,20 @@ export const createNote = async (req: Request, res: Response): Promise<void> => 
       },
     });
 
+    // Create activity for note creation
+    await ActivityService.createActivity(userId, {
+      type: 'note_created',
+      action: 'created',
+      targetType: 'note',
+      targetId: note.id,
+      title: `Created: ${title}`,
+      message: 'New note created successfully',
+      data: { 
+        noteId: note.id, 
+        preview: content ? content.substring(0, 100) + '...' : '' 
+      }
+    });
+
     res.status(201).json({
       success: true,
       message: 'Note created successfully',
@@ -67,6 +85,7 @@ export const createNote = async (req: Request, res: Response): Promise<void> => 
     });
   }
 };
+
 
 // Get Single Note
 export const getNote = async (req: Request, res: Response): Promise<void>  => {
@@ -217,11 +236,16 @@ export const getAllNotes = async (req: Request, res: Response): Promise<void> =>
 };
 
 // Update Note
-export const updateNote = async (req: Request, res: Response): Promise<void>  => {
+export const updateNote = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const { title, content, synopsis } = req.body;
     const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
 
     // Check if note exists and belongs to user
     const existingNote = await prisma.note.findFirst({
@@ -230,6 +254,10 @@ export const updateNote = async (req: Request, res: Response): Promise<void>  =>
         userId,
         isDeleted: false,
       },
+      select: {
+        id: true,
+        title: true,
+      }
     });
 
     if (!existingNote) {
@@ -237,7 +265,7 @@ export const updateNote = async (req: Request, res: Response): Promise<void>  =>
         success: false,
         error: 'Note not found or you do not have permission',
       });
-       return;
+      return;
     }
 
     // Update note
@@ -259,6 +287,20 @@ export const updateNote = async (req: Request, res: Response): Promise<void>  =>
       },
     });
 
+    // Create activity for note update
+    await ActivityService.createActivity(userId, {
+      type: 'note_updated',
+      action: 'updated',
+      targetType: 'note',
+      targetId: id,
+      title: `Updated: ${updatedNote.title}`,
+      message: 'Note content updated',
+      data: { 
+        noteId: id,
+        changes: { title: !!title, content: !!content, synopsis: synopsis !== undefined }
+      }
+    });
+
     res.status(200).json({
       success: true,
       message: 'Note updated successfully',
@@ -272,24 +314,32 @@ export const updateNote = async (req: Request, res: Response): Promise<void>  =>
     });
   }
 };
-
 // Soft Delete Note
-export const softDeleteNote = async (req: Request, res: Response): Promise<void>  => {
+export const softDeleteNote = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
 
     // Check if note exists and belongs to user
     const existingNote = await prisma.note.findFirst({
       where: {
         id,
         userId,
-        isDeleted: false, // Only soft delete if not already deleted
+        isDeleted: false,
       },
+      select: {
+        id: true,
+        title: true,
+      }
     });
 
     if (!existingNote) {
-       res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Note not found or already deleted',
       });
@@ -306,6 +356,20 @@ export const softDeleteNote = async (req: Request, res: Response): Promise<void>
       },
     });
 
+    // Create activity for moving to trash
+    await ActivityService.createActivity(userId, {
+      type: 'note_deleted',
+      action: 'deleted',
+      targetType: 'note',
+      targetId: id,
+      title: `Moved to trash: ${existingNote.title}`,
+      message: 'Note moved to trash',
+      data: { 
+        noteId: id,
+        deletedAt: new Date().toISOString()
+      }
+    });
+
     res.status(200).json({
       success: true,
       message: 'Note moved to trash successfully',
@@ -318,6 +382,7 @@ export const softDeleteNote = async (req: Request, res: Response): Promise<void>
     });
   }
 };
+
 
 // Get Deleted Notes (Trash)
 export const getDeletedNotes = async (req: Request, res: Response) => {
@@ -374,25 +439,34 @@ export const getDeletedNotes = async (req: Request, res: Response) => {
 };
 
 // Restore Note from Trash
-export const restoreNote = async (req: Request, res: Response): Promise<void>  => {
+export const restoreNote = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
 
     const existingNote = await prisma.note.findFirst({
       where: {
         id,
         userId,
-        isDeleted: true, // Only restore if it's in trash
+        isDeleted: true,
       },
+      select: {
+        id: true,
+        title: true,
+      }
     });
 
     if (!existingNote) {
-       res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Note not found in trash',
       });
-      return
+      return;
     }
 
     await prisma.note.update({
@@ -402,6 +476,20 @@ export const restoreNote = async (req: Request, res: Response): Promise<void>  =
         deletedAt: null,
         updatedAt: new Date(),
       },
+    });
+
+    // Create activity for restoring from trash
+    await ActivityService.createActivity(userId, {
+      type: 'note_restored',
+      action: 'restored',
+      targetType: 'note',
+      targetId: id,
+      title: `Restored: ${existingNote.title}`,
+      message: 'Note restored from trash',
+      data: { 
+        noteId: id,
+        restoredAt: new Date().toISOString()
+      }
     });
 
     res.status(200).json({
@@ -416,12 +504,16 @@ export const restoreNote = async (req: Request, res: Response): Promise<void>  =
     });
   }
 };
-
 // Permanently Delete Note
 export const deleteNotePermanently = async (req: Request, res: Response): Promise<void> => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
 
     // Verify note exists and belongs to user
     const existingNote = await prisma.note.findFirst({
@@ -429,15 +521,33 @@ export const deleteNotePermanently = async (req: Request, res: Response): Promis
         id,
         userId,
       },
+      select: {
+        id: true,
+        title: true,
+      }
     });
 
     if (!existingNote) {
-       res.status(404).json({
+      res.status(404).json({
         success: false,
         error: 'Note not found',
       });
-      return
+      return;
     }
+
+    // Create activity before deletion (for audit trail)
+    await ActivityService.createActivity(userId, {
+      type: 'note_permanently_deleted',
+      action: 'permanently_deleted',
+      targetType: 'note',
+      targetId: id,
+      title: `Permanently deleted: ${existingNote.title}`,
+      message: 'Note permanently deleted',
+      data: { 
+        noteId: id,
+        deletedAt: new Date().toISOString()
+      }
+    });
 
     // Permanently delete
     await prisma.note.delete({
@@ -462,6 +572,23 @@ export const emptyTrash = async (req: Request, res: Response) => {
   try {
     const userId = req.user?.id;
 
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    // Get notes before deletion for activity
+    const notesToDelete = await prisma.note.findMany({
+      where: {
+        userId,
+        isDeleted: true,
+      },
+      select: {
+        id: true,
+        title: true,
+      }
+    });
+
     // Delete all soft-deleted notes for the user
     const result = await prisma.note.deleteMany({
       where: {
@@ -469,6 +596,22 @@ export const emptyTrash = async (req: Request, res: Response) => {
         isDeleted: true,
       },
     });
+
+    // Create activity for emptying trash
+    if (notesToDelete.length > 0) {
+      await ActivityService.createActivity(userId, {
+        type: 'trash_emptied',
+        action: 'emptied',
+        targetType: 'system',
+        title: 'Trash emptied',
+        message: `Permanently deleted ${result.count} notes from trash`,
+        data: { 
+          count: result.count,
+          noteIds: notesToDelete.map(note => note.id),
+          deletedAt: new Date().toISOString()
+        }
+      });
+    }
 
     res.status(200).json({
       success: true,
@@ -609,6 +752,11 @@ export const togglePinNote = async (req: Request, res: Response): Promise<void> 
         userId,
         isDeleted: false,
       },
+      select: {
+        id: true,
+        title: true,
+        isPinned: true,
+      }
     });
 
     if (!existingNote) {
@@ -619,11 +767,12 @@ export const togglePinNote = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // Update pin status
+    // Update pin status with pinnedAt timestamp
     const updatedNote = await prisma.note.update({
       where: { id },
       data: {
         isPinned,
+        pinnedAt: isPinned ? new Date() : null,
         updatedAt: new Date(),
       },
       select: {
@@ -633,9 +782,24 @@ export const togglePinNote = async (req: Request, res: Response): Promise<void> 
         synopsis: true,
         isPinned: true,
         isFavorite: true,
+        pinnedAt: true,
         createdAt: true,
         updatedAt: true,
       },
+    });
+
+    // Create activity for pin/unpin
+    await ActivityService.createActivity(userId, {
+      type: 'note_updated',
+      action: isPinned ? 'pinned' : 'unpinned',
+      targetType: 'note',
+      targetId: id,
+      title: isPinned ? `Pinned: ${updatedNote.title}` : `Unpinned: ${updatedNote.title}`,
+      message: isPinned ? 'Note pinned for quick access' : 'Note removed from pinned',
+      data: { 
+        noteId: id,
+        previousState: { isPinned: existingNote.isPinned }
+      }
     });
 
     res.status(200).json({
@@ -651,7 +815,6 @@ export const togglePinNote = async (req: Request, res: Response): Promise<void> 
     });
   }
 };
-
 // Toggle Favorite Status
 export const toggleFavoriteNote = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -679,6 +842,11 @@ export const toggleFavoriteNote = async (req: Request, res: Response): Promise<v
         userId,
         isDeleted: false,
       },
+      select: {
+        id: true,
+        title: true,
+        isFavorite: true,
+      }
     });
 
     if (!existingNote) {
@@ -689,11 +857,12 @@ export const toggleFavoriteNote = async (req: Request, res: Response): Promise<v
       return;
     }
 
-    // Update favorite status
+    // Update favorite status with favoritedAt timestamp
     const updatedNote = await prisma.note.update({
       where: { id },
       data: {
         isFavorite,
+        favoritedAt: isFavorite ? new Date() : null,
         updatedAt: new Date(),
       },
       select: {
@@ -703,9 +872,24 @@ export const toggleFavoriteNote = async (req: Request, res: Response): Promise<v
         synopsis: true,
         isPinned: true,
         isFavorite: true,
+        favoritedAt: true,
         createdAt: true,
         updatedAt: true,
       },
+    });
+
+    // Create activity for favorite/unfavorite
+    await ActivityService.createActivity(userId, {
+      type: 'note_updated',
+      action: isFavorite ? 'favorited' : 'unfavorited',
+      targetType: 'note',
+      targetId: id,
+      title: isFavorite ? `Favorited: ${updatedNote.title}` : `Unfavorited: ${updatedNote.title}`,
+      message: isFavorite ? 'Note added to favorites' : 'Note removed from favorites',
+      data: { 
+        noteId: id,
+        previousState: { isFavorite: existingNote.isFavorite }
+      }
     });
 
     res.status(200).json({

@@ -20,8 +20,17 @@ import {
   getFavoriteNotes,     // ADD THIS
   getPinnedNotes,       // ADD THIS
 } from './controllers/notes'; 
+import {
+  getActivities,
+  markActivityAsRead,
+  markAllActivitiesAsRead,
+  getUnreadCount,
+  deleteActivity,
+  clearAllActivities,
+} from './controllers/activities';
 import { getUserProfile, updatePassword, updateUserProfile, updateUserSettings,getUserSettings, deleteAccount } from './controllers/auth';
 import { authenticate } from './middlewares/checkUser'
+
 
 dotenv.config();
 
@@ -77,6 +86,14 @@ app.get('/notes', authenticate, getAllNotes);
 // Favorite routes
 app.patch('/notes/:id/favorite', authenticate, toggleFavoriteNote);
 
+
+// Activities Routes
+app.get('/activities', authenticate, getActivities);
+app.get('/activities/unread-count', authenticate, getUnreadCount);
+app.patch('/activities/:id/read', authenticate, markActivityAsRead);
+app.patch('/activities/read-all', authenticate, markAllActivitiesAsRead);
+app.delete('/activities/:id', authenticate, deleteActivity);
+app.delete('/activities', authenticate, clearAllActivities);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

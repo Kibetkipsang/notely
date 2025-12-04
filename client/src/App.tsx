@@ -1,5 +1,6 @@
 import {Routes, Route} from 'react-router-dom'
 import { Header } from './components/Header'
+import { SettingsInitializer } from './components/SettingsInitializer';
 import Auth from './components/Auth'
 import Landing from './components/Home'
 import Dashboard from './components/pages/Dashboard'
@@ -17,6 +18,7 @@ function App() {
 
   return (
     <>
+    <SettingsInitializer />
     <Header/>
     <Routes>
       <Route path='/' element={<Landing />}/>

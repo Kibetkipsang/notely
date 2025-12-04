@@ -14,7 +14,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 model User {
   id           String   @id @default(uuid()) @db.UniqueIdentifier
   firstName    String   @db.VarChar(100)
@@ -38,8 +37,10 @@ model User {
   // Track last password change for security
   lastPasswordChange      DateTime  @default(now()) @map("last_password_change") @db.DateTimeOffset
   
+  // Relations
   notes Note[]
   settings UserSettings?
+  activities Activity[] // Add this
   
   @@map("Users")
   @@index([emailAddress])
@@ -59,6 +60,10 @@ model Note {
   isPinned   Boolean  @default(false) @map("is_pinned")
   isFavorite Boolean  @default(false) @map("is_favorite")
   
+  // Track when note was pinned/favorited for activity tracking
+  pinnedAt    DateTime? @map("pinned_at") @db.DateTimeOffset
+  favoritedAt DateTime? @map("favorited_at") @db.DateTimeOffset
+  
   isDeleted Boolean  @default(false) @map("is_deleted")
   deletedAt DateTime? @map("deleted_at") @db.DateTimeOffset
   createdAt DateTime @default(now()) @map("created_at") @db.DateTimeOffset
@@ -74,6 +79,8 @@ model Note {
   @@index([isFavorite])
   @@index([isPinned, isFavorite])
   @@index([updatedAt])
+  @@index([pinnedAt])
+  @@index([favoritedAt])
 }
 
 model UserSettings {
@@ -95,4 +102,37 @@ model UserSettings {
   
   @@map("UserSettings")
   @@index([userId])
+}
+
+// Add this Activity model for tracking user activities and notifications
+model Activity {
+  id          String   @id @default(uuid()) @db.UniqueIdentifier
+  userId      String   @map("user_id") @db.UniqueIdentifier
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  // Activity type
+  type        String   @db.VarChar(50)  // 'note_created', 'note_updated', 'note_pinned', 'note_favorited', 'note_deleted', 'note_restored', 'system'
+  action      String   @db.VarChar(50)  // 'created', 'updated', 'pinned', 'unpinned', 'favorited', 'unfavorited', 'deleted', 'restored'
+  
+  // Target of the activity
+  targetType  String   @db.VarChar(50)  // 'note', 'user', 'system'
+  targetId    String?  @db.VarChar(255) // ID of the note/user
+  
+  // Display information
+  title       String   @db.NVarChar(255)
+  message     String?  @db.NVarChar(500)
+  data        String?  @db.NVarChar(Max) // JSON for additional data (like note content preview)
+  
+  // Status and metadata
+  read        Boolean  @default(false)
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTimeOffset
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.DateTimeOffset
+  readAt      DateTime? @map("read_at") @db.DateTimeOffset
+  
+  @@map("Activities")
+  @@index([userId])
+  @@index([userId, read])
+  @@index([userId, createdAt])
+  @@index([type])
+  @@index([targetType, targetId])
 }
