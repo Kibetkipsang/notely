@@ -11,7 +11,7 @@ import {
   LogOut,
   Plus,
   ChevronRight,
-  BookOpen,
+  Pin,
   Archive,
   Star,
   Folder
@@ -43,9 +43,16 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     },
     {
       name: 'All Notes',
-      icon: <FileText className="h-5 w-5" />,
+      icon: <Folder className="h-5 w-5" />,
       path: '/notes',
       active: location.pathname === '/notes',
+    },
+    
+    {
+      name: 'Pinned Notes',
+      icon: <Pin className="h-5 w-5" />,
+      path: '/pinned',
+      active: location.pathname === '/pinned',
     },
     {
       name: 'Favorites',
@@ -54,28 +61,10 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       active: location.pathname === '/favorites',
     },
     {
-      name: 'Notebooks',
-      icon: <BookOpen className="h-5 w-5" />,
-      path: '/notebooks',
-      active: location.pathname === '/notebooks',
-    },
-    {
-      name: 'Categories',
-      icon: <Folder className="h-5 w-5" />,
-      path: '/categories',
-      active: location.pathname === '/categories',
-    },
-    {
       name: 'Trash',
       icon: <Trash2 className="h-5 w-5" />,
       path: '/trash',
       active: location.pathname === '/trash',
-    },
-    {
-      name: 'Archive',
-      icon: <Archive className="h-5 w-5" />,
-      path: '/archive',
-      active: location.pathname === '/archive',
     },
   ];
 
@@ -83,8 +72,8 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     {
       name: 'Profile',
       icon: <User className="h-5 w-5" />,
-      path: '/profile',
-      active: location.pathname === '/profile',
+      path: '/dashboard',
+      // active: location.pathname === '/dashboard',
     },
     {
       name: 'Settings',

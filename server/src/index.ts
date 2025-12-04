@@ -19,7 +19,8 @@ import {
   toggleFavoriteNote,   // ADD THIS
   getFavoriteNotes,     // ADD THIS
   getPinnedNotes,       // ADD THIS
-} from './controllers/notes';  // Make sure this path is correct
+} from './controllers/notes'; 
+import { getUserProfile, updatePassword, updateUserProfile, updateUserSettings,getUserSettings, deleteAccount } from './controllers/auth';
 import { authenticate } from './middlewares/checkUser'
 
 dotenv.config();
@@ -47,6 +48,12 @@ app.use(
 app.post('/auth/register', register);
 app.post('/auth/login', login);
 app.post('/auth/logout', logout);
+app.get('/auth/profile', authenticate, getUserProfile);
+app.put('/auth/profile', authenticate, updateUserProfile);
+app.put('/auth/password', authenticate, updatePassword);
+app.get('/auth/settings', authenticate, getUserSettings);
+app.put('/auth/settings', authenticate, updateUserSettings);
+app.delete('/auth/account', authenticate, deleteAccount);
 
 // Notes routes
 app.post('/notes/create', authenticate, createNote); 
@@ -55,6 +62,8 @@ app.get('/notes/search', authenticate, searchNotes);
 app.get('/notes/trash', authenticate, getDeletedNotes);
 app.delete('/notes/trash/empty', authenticate, emptyTrash); 
 app.get('/notes/favorites', authenticate, getFavoriteNotes);
+app.patch('/notes/:id/pin', authenticate, togglePinNote);
+app.get('/notes/pinned', authenticate, getPinnedNotes);
 app.post('/notes/:id/restore', authenticate, restoreNote);
 app.get('/notes/:id', authenticate, getNote);
 app.put('/notes/:id', authenticate, updateNote); 
@@ -62,10 +71,8 @@ app.patch('/notes/:id/soft-delete', authenticate, softDeleteNote);
 app.delete('/notes/:id', authenticate, deleteNotePermanently);
 app.get('/notes', authenticate, getAllNotes);
 
-// ADD THESE NEW ROUTES:
-// Pin routes
-app.patch('/notes/:id/pin', authenticate, togglePinNote);
-app.get('/notes/pinned', authenticate, getPinnedNotes);
+
+
 
 // Favorite routes
 app.patch('/notes/:id/favorite', authenticate, toggleFavoriteNote);

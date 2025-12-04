@@ -1,161 +1,150 @@
-import { useEffect, useState } from 'react';
+// pages/Dashboard.tsx
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import useAuthStore from '../../stores/useAuthStore';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../axios';
+import useAuthStore from '../../stores/useAuthStore';
 import Sidebar from './SideBar';
-import NoteCard from './NoteCard';
 import { Button } from '@/components/ui/button';
-import { Plus, Loader2, Menu } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-
-// Update NoteType to include pin and favorite
-type NoteType = {
-  id: string;
-  title: string;
-  content: string;
-  synopsis?: string;
-  createdAt: Date;
-  updatedAt: Date;
-  isDeleted: boolean;
-  userId: string;
-  isPinned?: boolean;
-  isFavorite?: boolean;
-};
+import {
+  User,
+  Mail,
+  Key,
+  Save,
+  Loader2,
+  Menu,
+  Shield,
+  Bell,
+  Globe,
+  Palette,
+  FileText,
+  BarChart3,
+  Calendar
+} from 'lucide-react';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { user } = useAuthStore();
+  const { user, setUser, clearUser } = useAuthStore();
   const queryClient = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // React Query for fetching notes
-  const {
-    data: notesData,
-    isLoading,
-    isError,
-    error,
-    refetch,
-  } = useQuery({
-    queryKey: ['notes', { page: 1, limit: 10 }],
+  // Fetch user stats
+  const { data: statsData, isLoading: statsLoading } = useQuery({
+    queryKey: ['user-stats'],
     queryFn: async () => {
-      const response = await api.get('/notes', {
-        params: { page: 1, limit: 10 }
-      });
+      const response = await api.get('/notes/stats');
       return response.data;
     },
     enabled: !!user,
   });
 
-  // Mutation for soft deleting a note
-  const deleteNoteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await api.patch(`/notes/${id}/soft-delete`);
+  // Profile form state
+  const [profileForm, setProfileForm] = useState({
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    emailAddress: user?.emailAddress || '',
+  });
+
+  // Password form state
+  const [passwordForm, setPasswordForm] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: '',
+  });
+
+  // Settings form state
+  const [settingsForm, setSettingsForm] = useState({
+    emailNotifications: true,
+    darkMode: false,
+    language: 'en',
+    timezone: 'UTC',
+  });
+
+  // Update profile mutation
+  const updateProfileMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await api.put('/auth/profile', data);
       return response.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] });
-      toast.success('Note moved to trash');
+    onSuccess: (data) => {
+      setUser(data.user);
+      toast.success('Profile updated successfully');
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to delete note');
+      toast.error(error?.response?.data?.message || 'Failed to update profile');
     },
   });
 
-  // Mutation for toggling pin status
-  const togglePinMutation = useMutation({
-    mutationFn: async ({ id, isPinned }: { id: string; isPinned: boolean }) => {
-      const response = await api.patch(`/notes/${id}/pin`, { 
-        isPinned: !isPinned 
+  // Update password mutation
+  const updatePasswordMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await api.put('/auth/password', data);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Password updated successfully');
+      setPasswordForm({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: '',
       });
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to update password');
+    },
+  });
+
+  // Update settings mutation
+  const updateSettingsMutation = useMutation({
+    mutationFn: async (data: any) => {
+      const response = await api.put('/auth/settings', data);
       return response.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] });
-      toast.success('Note updated');
+      toast.success('Settings updated successfully');
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to update note');
+      toast.error(error?.response?.data?.message || 'Failed to update settings');
     },
   });
 
-  // Mutation for toggling favorite status
-  const toggleFavoriteMutation = useMutation({
-    mutationFn: async ({ id, isFavorite }: { id: string; isFavorite: boolean }) => {
-      const response = await api.patch(`/notes/${id}/favorite`, { 
-        isFavorite: !isFavorite 
-      });
-      return response.data;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['notes'] });
-      queryClient.invalidateQueries({ queryKey: ['favorites'] });
-      toast.success('Note updated');
-    },
-    onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to update note');
-    },
-  });
+  // Handle profile update
+  const handleProfileUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateProfileMutation.mutate(profileForm);
+  };
 
-  // Redirect if not authenticated
-  useEffect(() => {
-    if (!user) {
-      navigate('/auth');
+  // Handle password update
+  const handlePasswordUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      toast.error('New passwords do not match');
+      return;
     }
-  }, [user, navigate]);
-
-  // Extract notes from response
-  const notes = notesData?.data || [];
-  const pagination = notesData?.pagination;
-
-  // Filter active notes
-  const activeNotes = notes.filter((note: NoteType) => !note.isDeleted);
-
-  // Sort notes: pinned first, then by updated date
-  const sortedNotes = [...activeNotes].sort((a, b) => {
-    // Pinned notes first
-    if (a.isPinned && !b.isPinned) return -1;
-    if (!a.isPinned && b.isPinned) return 1;
-    
-    // Then by updated date (newest first)
-    return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
-  });
-
-  // Separate pinned and unpinned notes for display
-  const pinnedNotes = sortedNotes.filter(note => note.isPinned);
-  const unpinnedNotes = sortedNotes.filter(note => !note.isPinned);
-
-  // Handlers
-  const handleCreateNote = () => {
-    navigate('/notes/create');
-  };
-
-  const handleRefresh = () => {
-    refetch();
-  };
-
-  const handleDeleteNote = (id: string) => {
-    if (window.confirm('Are you sure you want to move this note to trash?')) {
-      deleteNoteMutation.mutate(id);
+    if (passwordForm.newPassword.length < 6) {
+      toast.error('Password must be at least 6 characters');
+      return;
     }
+    updatePasswordMutation.mutate(passwordForm);
   };
 
-  const handleTogglePin = (id: string, isPinned: boolean) => {
-    togglePinMutation.mutate({ id, isPinned });
+  // Handle settings update
+  const handleSettingsUpdate = (e: React.FormEvent) => {
+    e.preventDefault();
+    updateSettingsMutation.mutate(settingsForm);
   };
 
-  const handleToggleFavorite = (id: string, isFavorite: boolean) => {
-    toggleFavoriteMutation.mutate({ id, isFavorite });
+  // Stats
+  const stats = statsData?.data || {
+    totalNotes: 0,
+    activeNotes: 0,
+    deletedNotes: 0,
+    recentNotes: 0,
   };
-
-  // If loading and no data yet
-  if (isLoading && !notesData) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-white to-orange-50 flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-orange-50 flex">
@@ -166,7 +155,7 @@ export default function Dashboard() {
       
       {/* Mobile sidebar */}
       {sidebarOpen && (
-        <div className="lg:hidden">
+        <div className="lg:hidden fixed inset-0 z-40">
           <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
         </div>
       )}
@@ -182,180 +171,445 @@ export default function Dashboard() {
             >
               <Menu className="h-6 w-6 text-gray-700" />
             </button>
-            <h1 className="text-xl font-bold text-gray-800">My Notes</h1>
-            <Button
-              onClick={handleCreateNote}
-              size="sm"
-              className="bg-gradient-to-r from-orange-500 to-orange-600 text-white"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+            <h1 className="text-xl font-bold text-gray-800">Dashboard</h1>
+            <div className="w-10"></div> {/* Spacer for alignment */}
           </div>
         </div>
 
-        <main className="p-4 lg:p-8">
-          {/* Desktop header */}
-          <div className="hidden lg:flex items-center justify-between mb-8">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-800 mb-2">
-                My Notes
-              </h1>
-              <div className="flex items-center gap-4">
-                <p className="text-gray-600">
-                  {activeNotes.length} {activeNotes.length === 1 ? 'note' : 'notes'}
-                  {pinnedNotes.length > 0 && ` • ${pinnedNotes.length} pinned`}
-                </p>
-                {isError && (
-                  <div className="text-red-500 text-sm">
-                    {error?.message || 'Failed to load notes'}
-                    <button 
-                      onClick={() => refetch()}
-                      className="ml-2 text-xs underline"
-                    >
-                      Retry
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <Button
-                variant="outline"
-                onClick={handleRefresh}
-                disabled={isLoading}
-                className="border-orange-300 text-gray-700 hover:border-orange-400 hover:text-orange-700"
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : null}
-                Refresh
-              </Button>
-              <Button
-                onClick={handleCreateNote}
-                size="lg"
-                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium shadow-md hover:shadow-lg"
-              >
-                <Plus className="mr-2 h-5 w-5" />
-                New Note
-              </Button>
-            </div>
+        <main className="p-4 lg:p-8 ">
+          {/* Welcome header */}
+          <div className="mb-8">
+            <h1 className="text-3xl font-bold text-gray-800 mb-2">
+              Welcome back, {user?.firstName}!
+            </h1>
+            <p className="text-gray-600">
+              Manage your profile, settings, and view your note statistics.
+            </p>
           </div>
 
-          {isLoading && notes.length === 0 ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
-            </div>
-          ) : activeNotes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <div className="mb-6 flex items-center justify-center rounded-3xl bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-md p-6">
-                <Plus className="h-12 w-12" />
-              </div>
-              <h2 className="text-2xl font-bold text-gray-800 mb-2">
-                No notes yet
-              </h2>
-              <p className="text-gray-600 mb-6 max-w-sm">
-                Start capturing your ideas and thoughts. Create your first note to get started.
-              </p>
-              <Button
-                onClick={handleCreateNote}
-                size="lg"
-                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium shadow-md hover:shadow-lg"
-              >
-                <Plus className="mr-2 h-5 w-5" />
-                Create Your First Note
-              </Button>
-            </div>
-          ) : (
-            <>
-              {isLoading && notes.length > 0 && (
-                <div className="flex items-center justify-center py-4">
-                  <Loader2 className="h-6 w-6 animate-spin text-orange-600 mr-2" />
-                  <span className="text-gray-600">Updating...</span>
-                </div>
-              )}
-
-              {/* Pinned Notes Section */}
-              {pinnedNotes.length > 0 && (
-                <div className="mb-8">
-                  <div className="flex items-center gap-3 mb-4">
-                    <h2 className="text-xl font-bold text-gray-800">Pinned Notes</h2>
-                    <span className="px-3 py-1 bg-orange-100 text-orange-700 text-sm font-medium rounded-full">
-                      {pinnedNotes.length}
-                    </span>
+          {/* Stats cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <Card className="bg-white border-orange-200">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Total Notes</p>
+                    <p className="text-2xl font-bold text-gray-800">{stats.totalNotes}</p>
                   </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {pinnedNotes.map((note: NoteType) => (
-                      <NoteCard
-                        key={note.id}
-                        note={note}
-                        onDelete={() => handleDeleteNote(note.id)}
-                        onEdit={() => navigate(`/edit/${note.id}`)}
-                        onView={() => navigate(`/notes/${note.id}`)}
-                        onTogglePin={handleTogglePin}
-                        onToggleFavorite={handleToggleFavorite}
-                        isDeleting={deleteNoteMutation.isPending && deleteNoteMutation.variables === note.id}
-                        showPinButton={true}
-                        showFavoriteButton={true}
+                  <div className="p-3 bg-orange-100 rounded-lg">
+                    <FileText className="h-6 w-6 text-orange-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border-orange-200">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Active Notes</p>
+                    <p className="text-2xl font-bold text-gray-800">{stats.activeNotes}</p>
+                  </div>
+                  <div className="p-3 bg-green-100 rounded-lg">
+                    <BarChart3 className="h-6 w-6 text-green-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border-orange-200">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">In Trash</p>
+                    <p className="text-2xl font-bold text-gray-800">{stats.deletedNotes}</p>
+                  </div>
+                  <div className="p-3 bg-red-100 rounded-lg">
+                    <Calendar className="h-6 w-6 text-red-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white border-orange-200">
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-500">Recent Notes</p>
+                    <p className="text-2xl font-bold text-gray-800">{stats.recentNotes}</p>
+                  </div>
+                  <div className="p-3 bg-blue-100 rounded-lg">
+                    <Calendar className="h-6 w-6 text-blue-600" />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Tabs for different sections */}
+          <Tabs defaultValue="profile" className="space-y-6">
+            <TabsList className="grid grid-cols-3 lg:grid-cols-5">
+              <TabsTrigger value="profile" className="flex items-center gap-2">
+                <User className="h-4 w-4" />
+                <span className="hidden lg:inline">Profile</span>
+              </TabsTrigger>
+              <TabsTrigger value="security" className="flex items-center gap-2">
+                <Shield className="h-4 w-4" />
+                <span className="hidden lg:inline">Security</span>
+              </TabsTrigger>
+              <TabsTrigger value="settings" className="flex items-center gap-2">
+                <Palette className="h-4 w-4" />
+                <span className="hidden lg:inline">Settings</span>
+              </TabsTrigger>
+              <TabsTrigger value="notifications" className="flex items-center gap-2">
+                <Bell className="h-4 w-4" />
+                <span className="hidden lg:inline">Notifications</span>
+              </TabsTrigger>
+              <TabsTrigger value="account" className="flex items-center gap-2">
+                <Globe className="h-4 w-4" />
+                <span className="hidden lg:inline">Account</span>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Profile Tab */}
+            <TabsContent value="profile" >
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <User className="h-5 w-5" />
+                    Profile Information
+                  </CardTitle>
+                  <CardDescription>
+                    Update your personal information and profile details.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleProfileUpdate} className="space-y-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">
+                          First Name
+                        </label>
+                        <Input
+                          value={profileForm.firstName}
+                          onChange={(e) => setProfileForm({...profileForm, firstName: e.target.value})}
+                          placeholder="Kibet"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">
+                          Last Name
+                        </label>
+                        <Input
+                          value={profileForm.lastName}
+                          onChange={(e) => setProfileForm({...profileForm, lastName: e.target.value})}
+                          placeholder="Dennis"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        Email Address
+                      </label>
+                      <Input
+                        type="email"
+                        value={profileForm.emailAddress}
+                        onChange={(e) => setProfileForm({...profileForm, emailAddress: e.target.value})}
+                        placeholder="kibet@example.com"
                       />
-                    ))}
-                  </div>
-                </div>
-              )}
+                    </div>
+                    <div className="pt-4">
+                      <Button
+                        type="submit"
+                        disabled={updateProfileMutation.isPending}
+                        className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
+                      >
+                        {updateProfileMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        Save Changes
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-              {/* All Notes Section */}
-              {unpinnedNotes.length > 0 && (
-                <div>
-                  <div className="flex items-center gap-3 mb-4">
-                    <h2 className="text-xl font-bold text-gray-800">All Notes</h2>
-                    <span className="px-3 py-1 bg-gray-100 text-gray-700 text-sm font-medium rounded-full">
-                      {unpinnedNotes.length}
-                    </span>
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {unpinnedNotes.map((note: NoteType) => (
-                      <NoteCard
-                        key={note.id}
-                        note={note}
-                        onDelete={() => handleDeleteNote(note.id)}
-                        onEdit={() => navigate(`/edit/${note.id}`)}
-                        onView={() => navigate(`/notes/${note.id}`)}
-                        onTogglePin={handleTogglePin}
-                        onToggleFavorite={handleToggleFavorite}
-                        isDeleting={deleteNoteMutation.isPending && deleteNoteMutation.variables === note.id}
-                        showPinButton={true}
-                        showFavoriteButton={true}
+            {/* Security Tab */}
+            <TabsContent value="security">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Key className="h-5 w-5" />
+                    Password & Security
+                  </CardTitle>
+                  <CardDescription>
+                    Change your password and manage security settings.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handlePasswordUpdate} className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        Current Password
+                      </label>
+                      <Input
+                        type="password"
+                        value={passwordForm.currentPassword}
+                        onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                        placeholder="Enter current password"
                       />
-                    ))}
-                  </div>
-                </div>
-              )}
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        New Password
+                      </label>
+                      <Input
+                        type="password"
+                        value={passwordForm.newPassword}
+                        onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                        placeholder="Enter new password"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium text-gray-700">
+                        Confirm New Password
+                      </label>
+                      <Input
+                        type="password"
+                        value={passwordForm.confirmPassword}
+                        onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                        placeholder="Confirm new password"
+                      />
+                    </div>
+                    <div className="pt-4">
+                      <Button
+                        type="submit"
+                        disabled={updatePasswordMutation.isPending}
+                        className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
+                      >
+                        {updatePasswordMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Key className="h-4 w-4 mr-2" />
+                        )}
+                        Update Password
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
 
-              {/* Pagination */}
-              {pagination && pagination.pages > 1 && (
-                <div className="flex justify-center mt-8">
-                  <Button
-                    variant="outline"
-                    onClick={() => refetch()}
-                    disabled={pagination.page === 1}
-                    className="border-orange-300 text-gray-700 hover:border-orange-400 hover:text-orange-700"
-                  >
-                    Previous
-                  </Button>
-                  <span className="mx-4 flex items-center text-gray-700">
-                    Page {pagination.page} of {pagination.pages}
-                  </span>
-                  <Button
-                    variant="outline"
-                    onClick={() => refetch()}
-                    disabled={!pagination.hasNextPage}
-                    className="border-orange-300 text-gray-700 hover:border-orange-400 hover:text-orange-700"
-                  >
-                    Next
-                  </Button>
-                </div>
-              )}
-            </>
-          )}
+            {/* Settings Tab */}
+            <TabsContent value="settings">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Palette className="h-5 w-5" />
+                    Preferences
+                  </CardTitle>
+                  <CardDescription>
+                    Customize your application preferences.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <form onSubmit={handleSettingsUpdate} className="space-y-6">
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <h3 className="font-medium text-gray-800">Dark Mode</h3>
+                          <p className="text-sm text-gray-600">
+                            Switch between light and dark theme
+                          </p>
+                        </div>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={settingsForm.darkMode}
+                            onChange={(e) => setSettingsForm({...settingsForm, darkMode: e.target.checked})}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+                        </label>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">
+                          Language
+                        </label>
+                        <select
+                          value={settingsForm.language}
+                          onChange={(e) => setSettingsForm({...settingsForm, language: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        >
+                          <option value="en">English</option>
+                          <option value="es">Spanish</option>
+                          <option value="fr">French</option>
+                          <option value="de">German</option>
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-gray-700">
+                          Timezone
+                        </label>
+                        <select
+                          value={settingsForm.timezone}
+                          onChange={(e) => setSettingsForm({...settingsForm, timezone: e.target.value})}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500"
+                        >
+                          <option value="UTC">UTC</option>
+                          <option value="EST">EST</option>
+                          <option value="PST">PST</option>
+                          <option value="CET">CET</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    <div className="pt-4">
+                      <Button
+                        type="submit"
+                        disabled={updateSettingsMutation.isPending}
+                        className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
+                      >
+                        {updateSettingsMutation.isPending ? (
+                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                        ) : (
+                          <Save className="h-4 w-4 mr-2" />
+                        )}
+                        Save Preferences
+                      </Button>
+                    </div>
+                  </form>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Notifications Tab */}
+            <TabsContent value="notifications">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Bell className="h-5 w-5" />
+                    Notification Settings
+                  </CardTitle>
+                  <CardDescription>
+                    Manage how you receive notifications.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <h3 className="font-medium text-gray-800">Email Notifications</h3>
+                        <p className="text-sm text-gray-600">
+                          Receive updates and notifications via email
+                        </p>
+                      </div>
+                      <label className="relative inline-flex items-center cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={settingsForm.emailNotifications}
+                          onChange={(e) => setSettingsForm({...settingsForm, emailNotifications: e.target.checked})}
+                          className="sr-only peer"
+                        />
+                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
+                      </label>
+                    </div>
+
+                    <div className="pt-6">
+                      <h3 className="font-medium text-gray-800 mb-4">Notification Types</h3>
+                      <div className="space-y-3">
+                        {[
+                          { id: 'new_note', label: 'New note created', default: true },
+                          { id: 'note_updated', label: 'Note updated', default: true },
+                          { id: 'trash_cleared', label: 'Trash cleared', default: false },
+                          { id: 'weekly_summary', label: 'Weekly summary', default: true },
+                          { id: 'security_alerts', label: 'Security alerts', default: true },
+                        ].map((item) => (
+                          <div key={item.id} className="flex items-center justify-between">
+                            <span className="text-gray-700">{item.label}</span>
+                            <input
+                              type="checkbox"
+                              defaultChecked={item.default}
+                              className="h-4 w-4 text-orange-600 rounded border-gray-300 focus:ring-orange-500"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Account Tab */}
+            <TabsContent value="account">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Globe className="h-5 w-5" />
+                    Account Management
+                  </CardTitle>
+                  <CardDescription>
+                    Manage your account and data.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                      <h3 className="font-medium text-red-800 mb-2">Danger Zone</h3>
+                      <p className="text-sm text-red-600 mb-4">
+                        These actions are irreversible. Please proceed with caution.
+                      </p>
+                      <div className="space-y-3">
+                        <Button
+                          variant="outline"
+                          className="w-full border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800"
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to delete all your notes? This action cannot be undone.')) {
+                              toast.info('This feature is coming soon');
+                            }
+                          }}
+                        >
+                          Delete All Notes
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="w-full border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800"
+                          onClick={() => {
+                            if (window.confirm('Are you sure you want to permanently delete your account? All data will be lost.')) {
+                              toast.info('This feature is coming soon');
+                            }
+                          }}
+                        >
+                          Delete Account
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="pt-4">
+                      <Button
+                        variant="outline"
+                        className="w-full border-gray-300 text-gray-700 hover:bg-gray-50"
+                        onClick={() => {
+                          if (window.confirm('Export all your notes as JSON?')) {
+                            toast.info('Export feature coming soon');
+                          }
+                        }}
+                      >
+                        Export All Data
+                      </Button>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+          </Tabs>
         </main>
       </div>
     </div>

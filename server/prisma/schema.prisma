@@ -39,6 +39,7 @@ model User {
   lastPasswordChange      DateTime  @default(now()) @map("last_password_change") @db.DateTimeOffset
   
   notes Note[]
+  settings UserSettings?
   
   @@map("Users")
   @@index([emailAddress])
@@ -73,4 +74,25 @@ model Note {
   @@index([isFavorite])
   @@index([isPinned, isFavorite])
   @@index([updatedAt])
+}
+
+model UserSettings {
+  id                 String   @id @default(uuid()) @db.UniqueIdentifier
+  emailNotifications Boolean  @default(true) @map("email_notifications")
+  darkMode           Boolean  @default(false) @map("dark_mode")
+  language           String   @default("en") @db.VarChar(10)
+  timezone           String   @default("UTC") @db.VarChar(50)
+  
+  // For future notifications customization
+  pushNotifications  Boolean  @default(true) @map("push_notifications")
+  soundEnabled       Boolean  @default(true) @map("sound_enabled")
+  
+  userId             String   @unique @map("user_id") @db.UniqueIdentifier
+  user               User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  createdAt          DateTime @default(now()) @map("created_at") @db.DateTimeOffset
+  updatedAt          DateTime @default(now()) @map("updated_at") @db.DateTimeOffset
+  
+  @@map("UserSettings")
+  @@index([userId])
 }
