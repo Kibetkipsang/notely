@@ -81,7 +81,7 @@ export const Header = () => {
               </Button>
             </DropdownMenuTrigger>
             
-            <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuContent align="end" className="w-56 bg-white border-orange-400">
            
               <div className="flex items-center gap-3 p-2">
                 <Avatar className="h-10 w-10 border border-orange-100">

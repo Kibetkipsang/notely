@@ -15,7 +15,11 @@ import {
   emptyTrash,
   searchNotes,
   getNoteStats,
-} from '../src/controllers/notes';
+  togglePinNote,        // ADD THIS
+  toggleFavoriteNote,   // ADD THIS
+  getFavoriteNotes,     // ADD THIS
+  getPinnedNotes,       // ADD THIS
+} from './controllers/notes';  // Make sure this path is correct
 import { authenticate } from './middlewares/checkUser'
 
 dotenv.config();
@@ -37,7 +41,6 @@ app.use(
   })
 );
 
-
 // Routes
 
 // Auth routes
@@ -45,18 +48,28 @@ app.post('/auth/register', register);
 app.post('/auth/login', login);
 app.post('/auth/logout', logout);
 
-// Notes routes - FIXED: Consistent naming
+// Notes routes
 app.post('/notes/create', authenticate, createNote); 
 app.get('/notes/stats', authenticate, getNoteStats);
 app.get('/notes/search', authenticate, searchNotes);
 app.get('/notes/trash', authenticate, getDeletedNotes);
 app.delete('/notes/trash/empty', authenticate, emptyTrash); 
+app.get('/notes/favorites', authenticate, getFavoriteNotes);
 app.post('/notes/:id/restore', authenticate, restoreNote);
 app.get('/notes/:id', authenticate, getNote);
 app.put('/notes/:id', authenticate, updateNote); 
 app.patch('/notes/:id/soft-delete', authenticate, softDeleteNote); 
 app.delete('/notes/:id', authenticate, deleteNotePermanently);
 app.get('/notes', authenticate, getAllNotes);
+
+// ADD THESE NEW ROUTES:
+// Pin routes
+app.patch('/notes/:id/pin', authenticate, togglePinNote);
+app.get('/notes/pinned', authenticate, getPinnedNotes);
+
+// Favorite routes
+app.patch('/notes/:id/favorite', authenticate, toggleFavoriteNote);
+
 
 // Health check endpoint
 app.get('/health', (req, res) => {
@@ -67,7 +80,7 @@ app.get('/health', (req, res) => {
   });
 });
 
-// 404 handler - ADD THIS
+// 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
     success: false,
@@ -92,4 +105,29 @@ app.listen(PORT, () => {
   console.log(`📡 API: http://localhost:${PORT}`);
   console.log(`🩺 Health: http://localhost:${PORT}/health`);
   console.log(`🌍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  
+  // Log available routes
+  console.log('\n📋 Available Routes:');
+  console.log('=====================');
+  console.log('POST   /auth/register');
+  console.log('POST   /auth/login');
+  console.log('POST   /auth/logout');
+  console.log('---------------------');
+  console.log('POST   /notes/create');
+  console.log('GET    /notes');
+  console.log('GET    /notes/favorites');    // NEW
+  console.log('GET    /notes/pinned');       // NEW
+  console.log('GET    /notes/:id');
+  console.log('PUT    /notes/:id');
+  console.log('PATCH  /notes/:id/pin');      // NEW
+  console.log('PATCH  /notes/:id/favorite'); // NEW
+  console.log('PATCH  /notes/:id/soft-delete');
+  console.log('DELETE /notes/:id');
+  console.log('GET    /notes/trash');
+  console.log('DELETE /notes/trash/empty');
+  console.log('POST   /notes/:id/restore');
+  console.log('GET    /notes/search');
+  console.log('GET    /notes/stats');
+  console.log('---------------------');
+  console.log('GET    /health');
 });

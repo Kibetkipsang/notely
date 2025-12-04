@@ -6,8 +6,6 @@ import useAuthStore from '../../stores/useAuthStore';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { ArrowLeft, Pencil, Trash2, Loader2 } from 'lucide-react';
-import ReactMarkdown from 'react-markdown';
-import remarkGfm from 'remark-gfm';
 import { formatDistanceToNow } from 'date-fns';
 import { toast } from 'sonner';
 
@@ -72,8 +70,8 @@ export default function NoteView() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-subtle flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-gradient-to-br from-white to-orange-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
       </div>
     );
   }
@@ -81,15 +79,15 @@ export default function NoteView() {
   // Error state
   if (error || !note) {
     return (
-      <div className="min-h-screen bg-gradient-subtle">
+      <div className="min-h-screen bg-gradient-to-br from-white to-orange-50">
         <main className="container mx-auto px-4 py-8">
           <div className="text-center space-y-4">
-            <h2 className="text-2xl font-bold text-foreground">Note not found</h2>
-            <p className="text-muted-foreground">The note you're looking for doesn't exist or you don't have permission to view it.</p>
+            <h2 className="text-2xl font-bold text-gray-800">Note not found</h2>
+            <p className="text-gray-600">The note you're looking for doesn't exist or you don't have permission to view it.</p>
             <Button
               onClick={handleBack}
               variant="outline"
-              className="gap-2 border-orange-400 text-gray-700"
+              className="gap-2 border-orange-400 text-gray-700 hover:border-orange-500 hover:text-orange-700"
             >
               <ArrowLeft className="h-4 w-4" />
               Back to Notes
@@ -101,128 +99,71 @@ export default function NoteView() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-subtle">
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="flex items-center justify-between mb-8">
-          <Button
-            variant="ghost"
-            onClick={handleBack}
-            className="gap-2 border-orange-400 text-gray-700 hover:bg-primary/10"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Notes
-          </Button>
-          <div className="flex gap-2">
+    <div className="min-h-screen bg-gradient-to-br from-white to-orange-50">
+      <main className="w-full px-4 py-8 lg:px-8">
+        <div className="mx-auto w-full max-w-6xl">
+          {/* Header with buttons */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
             <Button
               variant="outline"
-              onClick={handleEdit}
-              className="gap-2 hover:bg-primary hover:text-white border-orange-400 text-gray-700 transition-all"
-              disabled={deleteNoteMutation.isPending}
+              onClick={handleBack}
+              className="gap-2 border-orange-300 text-gray-700 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-400 transition-all w-full sm:w-auto"
             >
-              <Pencil className="h-4 w-4" />
-              Edit
+              <ArrowLeft className="h-4 w-4" />
+              Back to Notes
             </Button>
-            <Button
-              variant="outline"
-              onClick={handleDelete}
-              className="gap-2 hover:bg-destructive hover:text-white border-red-300 text-red-600 transition-all"
-              disabled={deleteNoteMutation.isPending}
-            >
-              {deleteNoteMutation.isPending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Trash2 className="h-4 w-4" />
-              )}
-              {deleteNoteMutation.isPending ? 'Deleting...' : 'Delete'}
-            </Button>
-          </div>
-        </div>
-
-        <Card className="border-border shadow-medium bg-card">
-          <CardHeader className="space-y-4">
-            <CardTitle className="text-3xl font-display font-bold text-foreground">
-              {note.title}
-            </CardTitle>
-            <CardDescription className="flex items-center gap-2 text-sm text-muted-foreground">
-              <span>Last updated {formatDistanceToNow(new Date(note.updatedAt), { addSuffix: true })}</span>
-              <span className="text-muted-foreground/50">•</span>
-              <span>Created {formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })}</span>
-            </CardDescription>
-            {note.synopsis && (
-              <div className="rounded-lg bg-muted/50 p-4 border border-border">
-                <p className="text-sm font-medium text-muted-foreground italic">
-                  {note.synopsis}
-                </p>
-              </div>
-            )}
-          </CardHeader>
-          <CardContent className="prose prose-neutral dark:prose-invert max-w-none">
-            <div className="text-foreground">
-              <ReactMarkdown
-                remarkPlugins={[remarkGfm]}
-                components={{
-                  h1: ({ children }) => (
-                    <h1 className="text-3xl font-display font-bold text-foreground mt-8 mb-4">
-                      {children}
-                    </h1>
-                  ),
-                  h2: ({ children }) => (
-                    <h2 className="text-2xl font-display font-bold text-foreground mt-6 mb-3">
-                      {children}
-                    </h2>
-                  ),
-                  h3: ({ children }) => (
-                    <h3 className="text-xl font-display font-bold text-foreground mt-5 mb-2">
-                      {children}
-                    </h3>
-                  ),
-                  p: ({ children }) => (
-                    <p className="text-foreground mb-4 leading-relaxed">
-                      {children}
-                    </p>
-                  ),
-                  a: ({ children, href }) => (
-                    <a
-                      href={href}
-                      className="text-primary hover:text-primary-dark underline underline-offset-4 transition-colors"
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      {children}
-                    </a>
-                  ),
-                  code: ({ children }) => (
-                    <code className="bg-muted px-2 py-1 rounded text-sm font-mono border border-border">
-                      {children}
-                    </code>
-                  ),
-                  pre: ({ children }) => (
-                    <pre className="bg-muted p-4 rounded-lg overflow-x-auto border border-border">
-                      {children}
-                    </pre>
-                  ),
-                  ul: ({ children }) => (
-                    <ul className="list-disc list-inside mb-4 space-y-1 text-foreground">
-                      {children}
-                    </ul>
-                  ),
-                  ol: ({ children }) => (
-                    <ol className="list-decimal list-inside mb-4 space-y-1 text-foreground">
-                      {children}
-                    </ol>
-                  ),
-                  blockquote: ({ children }) => (
-                    <blockquote className="border-l-4 border-primary pl-4 italic text-muted-foreground my-4">
-                      {children}
-                    </blockquote>
-                  ),
-                }}
+            <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+              <Button
+                variant="outline"
+                onClick={handleEdit}
+                className="gap-2 border-orange-300 text-gray-700 hover:bg-orange-600 hover:text-white hover:border-orange-600 transition-all w-full sm:w-auto"
+                disabled={deleteNoteMutation.isPending}
               >
-                {note.content}
-              </ReactMarkdown>
+                <Pencil className="h-4 w-4" />
+                Edit
+              </Button>
+              <Button
+                variant="outline"
+                onClick={handleDelete}
+                className="gap-2 border-red-300 text-red-600 hover:bg-red-600 hover:text-white hover:border-red-600 transition-all w-full sm:w-auto"
+                disabled={deleteNoteMutation.isPending}
+              >
+                {deleteNoteMutation.isPending ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Trash2 className="h-4 w-4" />
+                )}
+                {deleteNoteMutation.isPending ? 'Deleting...' : 'Delete'}
+              </Button>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+
+          {/* Note Card - Full width with proper padding */}
+          <Card className="border border-gray-200 bg-white shadow-xl w-full">
+            <CardHeader className="space-y-4 border-b border-gray-100 pb-6 px-6 sm:px-8">
+              <CardTitle className="text-3xl lg:text-4xl font-bold text-gray-800 break-words">
+                {note.title}
+              </CardTitle>
+              <CardDescription className="flex flex-col sm:flex-row items-start sm:items-center gap-2 text-sm text-gray-600">
+                <span>Last updated {formatDistanceToNow(new Date(note.updatedAt), { addSuffix: true })}</span>
+                <span className="hidden sm:inline text-gray-400">•</span>
+                <span>Created {formatDistanceToNow(new Date(note.createdAt), { addSuffix: true })}</span>
+              </CardDescription>
+              {note.synopsis && (
+                <div className="rounded-lg bg-orange-50 p-4 border border-orange-200 mt-4">
+                  <p className="text-sm font-medium text-orange-800 italic">
+                    {note.synopsis}
+                  </p>
+                </div>
+              )}
+            </CardHeader>
+            <CardContent className="p-6 sm:p-8">
+              <div className="text-gray-800 whitespace-pre-wrap break-words text-base leading-relaxed">
+                {note.content}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
       </main>
     </div>
   );

@@ -25,11 +25,7 @@ export const createNote = async (req: Request, res: Response): Promise<void> => 
     
     const { title, content, synopsis } = req.body;
     const userId = req.user?.id; 
-
-    if (!userId) {
-      res.status(401).json({ error: 'Unauthorized' });
-      return;
-    }
+   
 
     // Create note
     const note = await prisma.note.create({
@@ -77,18 +73,19 @@ export const getNote = async (req: Request, res: Response): Promise<void>  => {
   try {
     const { id } = req.params;
     const userId = req.user?.id;
-
     const note = await prisma.note.findFirst({
       where: {
         id,
         userId,
-        isDeleted: false, // Only fetch non-deleted notes
+        isDeleted: false,
       },
       select: {
         id: true,
         title: true,
         content: true,
         synopsis: true,
+        isPinned: true,      // ADD THIS
+        isFavorite: true,    // ADD THIS
         createdAt: true,
         updatedAt: true,
         user: {
@@ -127,12 +124,9 @@ export const getAllNotes = async (req: Request, res: Response): Promise<void> =>
   try {
     const userId = req.user?.id;
     
-    // ADD THESE DEBUG LOGS
     console.log('=== BACKEND: GET ALL NOTES ===');
     console.log('Request user:', req.user);
     console.log('User ID from req.user?.id:', userId);
-    console.log('Request cookies:', req.cookies);
-    console.log('Request headers:', req.headers);
     
     if (!userId) {
       console.log('ERROR: No user ID found in request');
@@ -172,7 +166,7 @@ export const getAllNotes = async (req: Request, res: Response): Promise<void> =>
     
     console.log('Total notes found in DB:', total);
 
-    // Get notes
+    // Get notes - ADD isPinned and isFavorite to select
     const notes = await prisma.note.findMany({
       where: whereClause,
       select: {
@@ -180,12 +174,15 @@ export const getAllNotes = async (req: Request, res: Response): Promise<void> =>
         title: true,
         content: true,
         synopsis: true,
+        isPinned: true,      // ADD THIS
+        isFavorite: true,    // ADD THIS
         createdAt: true,
         updatedAt: true,
       },
-      orderBy: {
-        updatedAt: 'desc',
-      },
+      orderBy: [
+        { isPinned: 'desc' }, // Pinned notes first
+        { updatedAt: 'desc' }, // Then by recency
+      ],
       skip,
       take: limit,
     });
@@ -582,6 +579,280 @@ export const getNoteStats = async (req: Request, res: Response) => {
     res.status(500).json({
       success: false,
       error: 'Failed to fetch note statistics',
+    });
+  }
+};
+
+export const togglePinNote = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { isPinned } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (typeof isPinned !== 'boolean') {
+      res.status(400).json({
+        success: false,
+        error: 'isPinned must be a boolean value',
+      });
+      return;
+    }
+
+    // Check if note exists and belongs to user
+    const existingNote = await prisma.note.findFirst({
+      where: {
+        id,
+        userId,
+        isDeleted: false,
+      },
+    });
+
+    if (!existingNote) {
+      res.status(404).json({
+        success: false,
+        error: 'Note not found or you do not have permission',
+      });
+      return;
+    }
+
+    // Update pin status
+    const updatedNote = await prisma.note.update({
+      where: { id },
+      data: {
+        isPinned,
+        updatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        synopsis: true,
+        isPinned: true,
+        isFavorite: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: isPinned ? 'Note pinned successfully' : 'Note unpinned successfully',
+      data: updatedNote,
+    });
+  } catch (error) {
+    console.error('Toggle pin error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update pin status',
+    });
+  }
+};
+
+// Toggle Favorite Status
+export const toggleFavoriteNote = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { isFavorite } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (typeof isFavorite !== 'boolean') {
+      res.status(400).json({
+        success: false,
+        error: 'isFavorite must be a boolean value',
+      });
+      return;
+    }
+
+    // Check if note exists and belongs to user
+    const existingNote = await prisma.note.findFirst({
+      where: {
+        id,
+        userId,
+        isDeleted: false,
+      },
+    });
+
+    if (!existingNote) {
+      res.status(404).json({
+        success: false,
+        error: 'Note not found or you do not have permission',
+      });
+      return;
+    }
+
+    // Update favorite status
+    const updatedNote = await prisma.note.update({
+      where: { id },
+      data: {
+        isFavorite,
+        updatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        synopsis: true,
+        isPinned: true,
+        isFavorite: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: isFavorite ? 'Note added to favorites' : 'Note removed from favorites',
+      data: updatedNote,
+    });
+  } catch (error) {
+    console.error('Toggle favorite error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update favorite status',
+    });
+  }
+};
+
+// Get Favorite Notes
+export const getFavoriteNotes = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
+    // Build where clause for favorite notes
+    const whereClause: any = {
+      userId,
+      isDeleted: false,
+      isFavorite: true,
+    };
+
+    // Get total count for pagination
+    const total = await prisma.note.count({
+      where: whereClause,
+    });
+
+    // Get favorite notes
+    const notes = await prisma.note.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        synopsis: true,
+        isPinned: true,
+        isFavorite: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: [
+        { isPinned: 'desc' }, // Pinned favorites first
+        { updatedAt: 'desc' }, // Then by recency
+      ],
+      skip,
+      take: limit,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: notes,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+        hasNextPage: page * limit < total,
+        hasPreviousPage: page > 1,
+      },
+    });
+  } catch (error) {
+    console.error('Get favorite notes error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch favorite notes',
+    });
+  }
+};
+
+// Get Pinned Notes
+export const getPinnedNotes = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
+    // Build where clause for pinned notes
+    const whereClause: any = {
+      userId,
+      isDeleted: false,
+      isPinned: true,
+    };
+
+    // Get total count for pagination
+    const total = await prisma.note.count({
+      where: whereClause,
+    });
+
+    // Get pinned notes
+    const notes = await prisma.note.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        synopsis: true,
+        isPinned: true,
+        isFavorite: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+      skip,
+      take: limit,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: notes,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+        hasNextPage: page * limit < total,
+        hasPreviousPage: page > 1,
+      },
+    });
+  } catch (error) {
+    console.error('Get pinned notes error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch pinned notes',
     });
   }
 };

@@ -53,6 +53,11 @@ model Note {
   title     String   @db.NVarChar(255)
   content   String   @db.NVarChar(Max)
   synopsis  String?  @db.NVarChar(500) 
+  
+  // Add pin and favorite functionality
+  isPinned   Boolean  @default(false) @map("is_pinned")
+  isFavorite Boolean  @default(false) @map("is_favorite")
+  
   isDeleted Boolean  @default(false) @map("is_deleted")
   deletedAt DateTime? @map("deleted_at") @db.DateTimeOffset
   createdAt DateTime @default(now()) @map("created_at") @db.DateTimeOffset
@@ -64,4 +69,8 @@ model Note {
   @@map("Notes")
   @@index([userId])
   @@index([isDeleted, deletedAt])
+  @@index([isPinned])
+  @@index([isFavorite])
+  @@index([isPinned, isFavorite])
+  @@index([updatedAt])
 }

@@ -39,7 +39,6 @@ export default function Editor() {
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [synopsis, setSynopsis] = useState('');
-  const [shouldRedirect, setShouldRedirect] = useState(false);
 
   // Check authentication and redirect if needed
   useEffect(() => {
@@ -56,28 +55,18 @@ export default function Editor() {
       const response = await api.get(`/notes/${id}`);
       return response.data.data as NoteType;
     },
-    enabled: isEditMode && !!id && !!user, // Only fetch if editing and user is authenticated
+    enabled: isEditMode && !!id && !!user,
     retry: false,
   });
 
-  // Handle fetch errors (e.g., note not found)
+  // Handle fetch errors
   useEffect(() => {
     if (fetchError) {
       console.error('Error fetching note:', fetchError);
       toast.error('Failed to load note');
-      setShouldRedirect(true);
+      navigate('/dashboard');
     }
-  }, [fetchError]);
-
-  // Redirect after error
-  useEffect(() => {
-    if (shouldRedirect) {
-      const timer = setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
-      return () => clearTimeout(timer);
-    }
-  }, [shouldRedirect, navigate]);
+  }, [fetchError, navigate]);
 
   // Update form when note data loads
   useEffect(() => {
@@ -154,131 +143,127 @@ export default function Editor() {
   // Show loading state
   if (isEditMode && isLoadingNote) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-gradient-to-br from-white to-orange-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
       </div>
     );
   }
 
-  // Show redirect message if needed
-  if (shouldRedirect) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-        <p className="text-gray-600">Redirecting to dashboard...</p>
-      </div>
-    );
-  }
-
-  // Check if user is still loading (to prevent premature redirect)
   if (!user) {
     return (
-      <div className="min-h-screen bg-white flex items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      <div className="min-h-screen bg-gradient-to-br from-white to-orange-50 flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-orange-600" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <main className="container mx-auto px-4 py-8 max-w-4xl">
-        <div className="flex items-center justify-between mb-8">
-          <Button
-            variant="outline"
-            onClick={handleBack}
-            className="gap-2 border-orange-400 text-gray-700"
-            disabled={isSaving}
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Back to Notes
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="bg-gradient-primary hover:opacity-90 text-white font-medium shadow-soft hover:shadow-medium transition-all"
-          >
-            {isSaving ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Saving...
-              </>
-            ) : (
-              <>
-                <Save className="mr-2 h-4 w-4" />
-                Save Note
-              </>
-            )}
-          </Button>
-        </div>
+    <div className="min-h-screen bg-gradient-to-br from-white to-orange-50">
+      <main className="w-full px-4 py-8 lg:px-8">
+        <div className="mx-auto w-full max-w-6xl">
+          {/* Header */}
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-8">
+            <Button
+              variant="outline"
+              onClick={handleBack}
+              className="gap-2 border-orange-300 text-gray-700 hover:bg-orange-50 hover:text-orange-700 hover:border-orange-400 transition-all w-full sm:w-auto"
+              disabled={isSaving}
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Notes
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white font-medium shadow-md hover:shadow-lg transition-all w-full sm:w-auto"
+            >
+              {isSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <Save className="mr-2 h-4 w-4" />
+                  Save Note
+                </>
+              )}
+            </Button>
+          </div>
 
-        <Card className="border border-gray-200 shadow-md">
-          <CardContent className="p-6 space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="title" className="text-base font-semibold text-gray-700">
-                Title
-              </Label>
-              <Input
-                id="title"
-                placeholder="Enter note title..."
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="text-lg font-medium border-gray-300 focus:border-orange-500 focus:ring-orange-500"
-                disabled={isSaving}
-              />
-            </div>
+          {/* Editor Card */}
+          <Card className="border border-gray-200 bg-white shadow-xl w-full">
+            <CardContent className="p-6 sm:p-8 space-y-8">
+              {/* Title */}
+              <div className="space-y-3">
+                <Label htmlFor="title" className="text-base font-semibold text-gray-800">
+                  Title
+                </Label>
+                <Input
+                  id="title"
+                  placeholder="Enter note title..."
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="text-lg font-medium border-gray-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 rounded-lg py-3 px-4"
+                  disabled={isSaving}
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="synopsis" className="text-base font-semibold text-gray-700">
-                Synopsis <span className="text-gray-500 font-normal">(Optional)</span>
-              </Label>
-              <Textarea
-                id="synopsis"
-                placeholder="Brief summary of your note..."
-                value={synopsis}
-                onChange={(e) => setSynopsis(e.target.value)}
-                rows={2}
-                className="border-gray-300 focus:border-orange-500 focus:ring-orange-500 resize-none"
-                disabled={isSaving}
-              />
-            </div>
+              {/* Synopsis */}
+              <div className="space-y-3">
+                <Label htmlFor="synopsis" className="text-base font-semibold text-gray-800">
+                  Synopsis <span className="text-gray-500 font-normal">(Optional)</span>
+                </Label>
+                <Textarea
+                  id="synopsis"
+                  placeholder="Brief summary of your note..."
+                  value={synopsis}
+                  onChange={(e) => setSynopsis(e.target.value)}
+                  rows={2}
+                  className="border-gray-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 rounded-lg resize-none py-3 px-4"
+                  disabled={isSaving}
+                />
+              </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="content" className="text-base font-semibold text-gray-700">
-                Content
-              </Label>
-              <Textarea
-                id="content"
-                placeholder="Write your note content here..."
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                rows={16}
-                className="border-gray-300 focus:border-orange-500 focus:ring-orange-500 font-sans text-sm"
-                disabled={isSaving}
-              />
-              <p className="text-xs text-gray-500">
-                Tip: Keep your notes organized and focused.
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+              {/* Content */}
+              <div className="space-y-3">
+                <Label htmlFor="content" className="text-base font-semibold text-gray-800">
+                  Content
+                </Label>
+                <Textarea
+                  id="content"
+                  placeholder="Write your note content here..."
+                  value={content}
+                  onChange={(e) => setContent(e.target.value)}
+                  rows={20}
+                  className="border-gray-300 focus:border-orange-500 focus:ring-2 focus:ring-orange-200 rounded-lg font-sans text-base py-3 px-4 min-h-[400px]"
+                  disabled={isSaving}
+                />
+                <p className="text-sm text-gray-500">
+                  Tip: Keep your notes organized and focused.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
 
-        {/* Quick action buttons */}
-        <div className="flex justify-end gap-4 mt-6">
-          <Button
-            variant="outline"
-            onClick={handleBack}
-            disabled={isSaving}
-            className="border-gray-300 text-gray-700"
-          >
-            Cancel
-          </Button>
-          <Button
-            onClick={handleSave}
-            disabled={isSaving}
-            className="bg-gradient-primary hover:opacity-90 text-white"
-          >
-            {isSaving ? 'Saving...' : 'Save Note'}
-          </Button>
+          {/* Action Buttons */}
+          <div className="flex flex-col sm:flex-row justify-end gap-4 mt-8">
+            <Button
+              variant="outline"
+              onClick={handleBack}
+              disabled={isSaving}
+              className="border-gray-300 text-gray-700 hover:border-orange-400 hover:text-orange-700 w-full sm:w-auto"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-md hover:shadow-lg w-full sm:w-auto"
+            >
+              {isSaving ? 'Saving...' : 'Save Note'}
+            </Button>
+          </div>
         </div>
       </main>
     </div>
