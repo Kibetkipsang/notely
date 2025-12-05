@@ -59,6 +59,8 @@ model Note {
   // Add pin and favorite functionality
   isPinned   Boolean  @default(false) @map("is_pinned")
   isFavorite Boolean  @default(false) @map("is_favorite")
+  bookmarked Boolean  @default(false) @map("is_bookmarked")
+  bookmarkedAt DateTime? @map("bookmarked_at") @db.DateTimeOffset
   
   // Track when note was pinned/favorited for activity tracking
   pinnedAt    DateTime? @map("pinned_at") @db.DateTimeOffset
@@ -78,9 +80,11 @@ model Note {
   @@index([isPinned])
   @@index([isFavorite])
   @@index([isPinned, isFavorite])
+  @@index([bookmarked])
   @@index([updatedAt])
   @@index([pinnedAt])
   @@index([favoritedAt])
+  @@index([bookmarkedAt])
 }
 
 model UserSettings {
@@ -111,8 +115,8 @@ model Activity {
   user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   
   // Activity type
-  type        String   @db.VarChar(50)  // 'note_created', 'note_updated', 'note_pinned', 'note_favorited', 'note_deleted', 'note_restored', 'system'
-  action      String   @db.VarChar(50)  // 'created', 'updated', 'pinned', 'unpinned', 'favorited', 'unfavorited', 'deleted', 'restored'
+  type        String   @db.VarChar(50)  // 'note_created', 'note_updated', 'note_pinned', 'note_favorited', 'note_bookmarked', 'note_deleted', 'note_restored', 'system'
+  action      String   @db.VarChar(50)  // 'created', 'updated', 'pinned', 'unpinned', 'favorited', 'unfavorited', 'bookmarked', 'unbookmarked', 'deleted', 'restored'
   
   // Target of the activity
   targetType  String   @db.VarChar(50)  // 'note', 'user', 'system'

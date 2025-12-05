@@ -105,6 +105,8 @@ export const getNote = async (req: Request, res: Response): Promise<void>  => {
         synopsis: true,
         isPinned: true,      // ADD THIS
         isFavorite: true,    // ADD THIS
+        bookmarked: true,    // ADD THIS
+        bookmarkedAt: true,  // ADD THIS
         createdAt: true,
         updatedAt: true,
         user: {
@@ -185,7 +187,7 @@ export const getAllNotes = async (req: Request, res: Response): Promise<void> =>
     
     console.log('Total notes found in DB:', total);
 
-    // Get notes - ADD isPinned and isFavorite to select
+    // Get notes - ADD bookmark fields to select
     const notes = await prisma.note.findMany({
       where: whereClause,
       select: {
@@ -193,8 +195,10 @@ export const getAllNotes = async (req: Request, res: Response): Promise<void> =>
         title: true,
         content: true,
         synopsis: true,
-        isPinned: true,      // ADD THIS
-        isFavorite: true,    // ADD THIS
+        isPinned: true,
+        isFavorite: true,
+        bookmarked: true,    // ADD THIS
+        bookmarkedAt: true,  // ADD THIS
         createdAt: true,
         updatedAt: true,
       },
@@ -314,6 +318,7 @@ export const updateNote = async (req: Request, res: Response): Promise<void> => 
     });
   }
 };
+
 // Soft Delete Note
 export const softDeleteNote = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -504,6 +509,7 @@ export const restoreNote = async (req: Request, res: Response): Promise<void> =>
     });
   }
 };
+
 // Permanently Delete Note
 export const deleteNotePermanently = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -782,6 +788,7 @@ export const togglePinNote = async (req: Request, res: Response): Promise<void> 
         synopsis: true,
         isPinned: true,
         isFavorite: true,
+        bookmarked: true,    // ADD THIS
         pinnedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -815,6 +822,7 @@ export const togglePinNote = async (req: Request, res: Response): Promise<void> 
     });
   }
 };
+
 // Toggle Favorite Status
 export const toggleFavoriteNote = async (req: Request, res: Response): Promise<void> => {
   try {
@@ -872,6 +880,7 @@ export const toggleFavoriteNote = async (req: Request, res: Response): Promise<v
         synopsis: true,
         isPinned: true,
         isFavorite: true,
+        bookmarked: true,    // ADD THIS
         favoritedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -902,6 +911,98 @@ export const toggleFavoriteNote = async (req: Request, res: Response): Promise<v
     res.status(500).json({
       success: false,
       error: 'Failed to update favorite status',
+    });
+  }
+};
+
+// Toggle Bookmark Status
+export const toggleBookmarkNote = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const { id } = req.params;
+    const { bookmarked } = req.body;
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    if (typeof bookmarked !== 'boolean') {
+      res.status(400).json({
+        success: false,
+        error: 'bookmarked must be a boolean value',
+      });
+      return;
+    }
+
+    // Check if note exists and belongs to user
+    const existingNote = await prisma.note.findFirst({
+      where: {
+        id,
+        userId,
+        isDeleted: false,
+      },
+      select: {
+        id: true,
+        title: true,
+        bookmarked: true,
+      }
+    });
+
+    if (!existingNote) {
+      res.status(404).json({
+        success: false,
+        error: 'Note not found or you do not have permission',
+      });
+      return;
+    }
+
+    // Update bookmark status with bookmarkedAt timestamp
+    const updatedNote = await prisma.note.update({
+      where: { id },
+      data: {
+        bookmarked,
+        bookmarkedAt: bookmarked ? new Date() : null,
+        updatedAt: new Date(),
+      },
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        synopsis: true,
+        isPinned: true,
+        isFavorite: true,
+        bookmarked: true,
+        bookmarkedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+    });
+
+    // Create activity for bookmark/unbookmark
+    await ActivityService.createActivity(userId, {
+      type: 'note_updated',
+      action: bookmarked ? 'bookmarked' : 'unbookmarked',
+      targetType: 'note',
+      targetId: id,
+      title: bookmarked ? `Bookmarked: ${updatedNote.title}` : `Unbookmarked: ${updatedNote.title}`,
+      message: bookmarked ? 'Note added to bookmarks' : 'Note removed from bookmarks',
+      data: { 
+        noteId: id,
+        previousState: { bookmarked: existingNote.bookmarked }
+      }
+    });
+
+    res.status(200).json({
+      success: true,
+      message: bookmarked ? 'Note bookmarked successfully' : 'Note unbookmarked successfully',
+      data: updatedNote,
+    });
+  } catch (error) {
+    console.error('Toggle bookmark error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to update bookmark status',
     });
   }
 };
@@ -942,6 +1043,7 @@ export const getFavoriteNotes = async (req: Request, res: Response): Promise<voi
         synopsis: true,
         isPinned: true,
         isFavorite: true,
+        bookmarked: true,    // ADD THIS
         createdAt: true,
         updatedAt: true,
       },
@@ -1010,6 +1112,7 @@ export const getPinnedNotes = async (req: Request, res: Response): Promise<void>
         synopsis: true,
         isPinned: true,
         isFavorite: true,
+        bookmarked: true,    // ADD THIS
         createdAt: true,
         updatedAt: true,
       },
@@ -1037,6 +1140,76 @@ export const getPinnedNotes = async (req: Request, res: Response): Promise<void>
     res.status(500).json({
       success: false,
       error: 'Failed to fetch pinned notes',
+    });
+  }
+};
+
+// Get Bookmarked Notes
+export const getBookmarkedNotes = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    
+    if (!userId) {
+      res.status(401).json({ error: 'Unauthorized' });
+      return;
+    }
+
+    const page = parseInt(req.query.page as string) || 1;
+    const limit = parseInt(req.query.limit as string) || 10;
+    const skip = (page - 1) * limit;
+
+    // Build where clause for bookmarked notes
+    const whereClause: any = {
+      userId,
+      isDeleted: false,
+      bookmarked: true,
+    };
+
+    // Get total count for pagination
+    const total = await prisma.note.count({
+      where: whereClause,
+    });
+
+    // Get bookmarked notes
+    const notes = await prisma.note.findMany({
+      where: whereClause,
+      select: {
+        id: true,
+        title: true,
+        content: true,
+        synopsis: true,
+        isPinned: true,
+        isFavorite: true,
+        bookmarked: true,
+        bookmarkedAt: true,
+        createdAt: true,
+        updatedAt: true,
+      },
+      orderBy: [
+        { isPinned: 'desc' }, // Pinned bookmarks first
+        { bookmarkedAt: 'desc' }, // Then by bookmark date
+      ],
+      skip,
+      take: limit,
+    });
+
+    res.status(200).json({
+      success: true,
+      data: notes,
+      pagination: {
+        page,
+        limit,
+        total,
+        pages: Math.ceil(total / limit),
+        hasNextPage: page * limit < total,
+        hasPreviousPage: page > 1,
+      },
+    });
+  } catch (error) {
+    console.error('Get bookmarked notes error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to fetch bookmarked notes',
     });
   }
 };

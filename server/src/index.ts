@@ -17,8 +17,10 @@ import {
   getNoteStats,
   togglePinNote,        // ADD THIS
   toggleFavoriteNote,   // ADD THIS
+  toggleBookmarkNote,   // ADD THIS
   getFavoriteNotes,     // ADD THIS
   getPinnedNotes,       // ADD THIS
+  getBookmarkedNotes    // ADD THIS
 } from './controllers/notes'; 
 import {
   getActivities,
@@ -71,21 +73,17 @@ app.get('/notes/search', authenticate, searchNotes);
 app.get('/notes/trash', authenticate, getDeletedNotes);
 app.delete('/notes/trash/empty', authenticate, emptyTrash); 
 app.get('/notes/favorites', authenticate, getFavoriteNotes);
-app.patch('/notes/:id/pin', authenticate, togglePinNote);
 app.get('/notes/pinned', authenticate, getPinnedNotes);
+app.get('/notes/bookmarks', authenticate, getBookmarkedNotes); // NEW
+app.patch('/notes/:id/pin', authenticate, togglePinNote);
+app.patch('/notes/:id/favorite', authenticate, toggleFavoriteNote);
+app.patch('/notes/:id/bookmark', authenticate, toggleBookmarkNote); // NEW
 app.post('/notes/:id/restore', authenticate, restoreNote);
 app.get('/notes/:id', authenticate, getNote);
 app.put('/notes/:id', authenticate, updateNote); 
 app.patch('/notes/:id/soft-delete', authenticate, softDeleteNote); 
 app.delete('/notes/:id', authenticate, deleteNotePermanently);
 app.get('/notes', authenticate, getAllNotes);
-
-
-
-
-// Favorite routes
-app.patch('/notes/:id/favorite', authenticate, toggleFavoriteNote);
-
 
 // Activities Routes
 app.get('/activities', authenticate, getActivities);
@@ -136,15 +134,23 @@ app.listen(PORT, () => {
   console.log('POST   /auth/register');
   console.log('POST   /auth/login');
   console.log('POST   /auth/logout');
+  console.log('GET    /auth/profile');
+  console.log('PUT    /auth/profile');
+  console.log('PUT    /auth/password');
+  console.log('GET    /auth/settings');
+  console.log('PUT    /auth/settings');
+  console.log('DELETE /auth/account');
   console.log('---------------------');
   console.log('POST   /notes/create');
   console.log('GET    /notes');
-  console.log('GET    /notes/favorites');    // NEW
-  console.log('GET    /notes/pinned');       // NEW
+  console.log('GET    /notes/favorites');
+  console.log('GET    /notes/pinned');
+  console.log('GET    /notes/bookmarks');     // NEW
   console.log('GET    /notes/:id');
   console.log('PUT    /notes/:id');
-  console.log('PATCH  /notes/:id/pin');      // NEW
-  console.log('PATCH  /notes/:id/favorite'); // NEW
+  console.log('PATCH  /notes/:id/pin');
+  console.log('PATCH  /notes/:id/favorite');
+  console.log('PATCH  /notes/:id/bookmark');  // NEW
   console.log('PATCH  /notes/:id/soft-delete');
   console.log('DELETE /notes/:id');
   console.log('GET    /notes/trash');
@@ -152,6 +158,13 @@ app.listen(PORT, () => {
   console.log('POST   /notes/:id/restore');
   console.log('GET    /notes/search');
   console.log('GET    /notes/stats');
+  console.log('---------------------');
+  console.log('GET    /activities');
+  console.log('GET    /activities/unread-count');
+  console.log('PATCH  /activities/:id/read');
+  console.log('PATCH  /activities/read-all');
+  console.log('DELETE /activities/:id');
+  console.log('DELETE /activities');
   console.log('---------------------');
   console.log('GET    /health');
 });
