@@ -1,5 +1,5 @@
 import { create } from "zustand";
-import { persist } from 'zustand/middleware'; // Add this import
+import { persist } from 'zustand/middleware';
 
 type UserType = {
   id: string;
@@ -24,21 +24,25 @@ const useAuthStore = create<AuthStore>()(
       token: null,
       
       setUser: (user, token) => {
-        set({ user });
         if (token) {
-          set({ token });
-          // Also store token in localStorage for axios interceptor
+          set({ user, token });
+          // Only store token in localStorage here
           localStorage.setItem('token', token);
+        } else {
+          set({ user });
         }
       },
       
       clearUser: () => {
         set({ user: null, token: null });
         localStorage.removeItem('token');
+        localStorage.removeItem('auth-storage'); // Clear Zustand's persisted state too
       },
     }),
     {
       name: 'auth-storage',
+      // Optional: Exclude token from persistence since we're storing it separately
+      // partialize: (state) => ({ user: state.user })
     }
   )
 );

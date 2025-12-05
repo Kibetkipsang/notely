@@ -1,16 +1,14 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react'; // Added useRef import
 import { api } from '../axios';
 import { useNavigate } from 'react-router-dom';
 import { useMutation } from '@tanstack/react-query';
 import useAuthStore from '../stores/useAuthStore';
-
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-
 
 type UserDataType = {
   firstName: string;
@@ -53,15 +51,24 @@ export default function Auth() {
   const [confirmPassword, setConfirmPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   
+  // Add useRef to prevent infinite loop
+  const hasRedirected = useRef(false);
+  
+  // FIXED: Add proper useEffect dependency array
   useEffect(() => {
-    const token = localStorage.getItem('token');
-    console.log('Auth check:', { user, hasToken: !!token });
+    // Prevent multiple redirects
+    if (hasRedirected.current) return;
     
+    const token = localStorage.getItem('token');
+    
+    // Only redirect if we have both user AND token
     if (user && token) {
-      console.log('User authenticated, redirecting...');
+      hasRedirected.current = true;
+      console.log('User authenticated, redirecting to dashboard...');
       navigate('/dashboard');
     }
-  }, [user, navigate]);
+  }, [user, navigate]); // Only re-run when user or navigate changes
+
   // Register mutation
   const registerMutation = useMutation({
     mutationKey: ["register"],
@@ -84,42 +91,41 @@ export default function Auth() {
     },
   });
 
-  // Login mutation
-  // Update your login mutation to debug the response
-const loginMutation = useMutation({
-  mutationKey: ["login"],
-  mutationFn: loginUser,
-  onSuccess: (data) => {
-    console.log('🎯 LOGIN RESPONSE:', data); // Debug the actual response
-    
-    // Check different possible response structures
-    if (data.success || data.token || data.accessToken) {
-      toast.success("Login successful!");
+  // Login mutation - FIXED
+  const loginMutation = useMutation({
+    mutationKey: ["login"],
+    mutationFn: loginUser,
+    onSuccess: (data) => {
+      console.log('Login response:', data);
       
-      // Try different possible response structures
-      const user = data.user || data.data?.user;
-      const token = data.token || data.accessToken || data.data?.token;
-      
-      console.log('Extracted:', { user, token });
-      
-      if (user && token) {
-        setUser(user);
-        // ✅ CRITICAL: Store the token
-        localStorage.setItem('token', token);
-        console.log('Token stored in localStorage');
+      // Check different possible response structures
+      if (data.success || data.token || data.accessToken) {
+        toast.success("Login successful!");
+        
+        // Try different possible response structures
+        const user = data.user || data.data?.user;
+        const token = data.token || data.accessToken || data.data?.token;
+        
+        console.log('Extracted:', { user, token });
+        
+        if (user && token) {
+          // FIXED: Use setUser with token
+          setUser(user, token);
+          console.log('User and token set in store');
+        } else {
+          console.error('Missing user or token:', data);
+          toast.error('Login succeeded but missing token');
+        }
       } else {
-        console.error('Missing user or token:', data);
-        toast.error('Login succeeded but missing token');
+        toast.error(data.message || "Login failed");
       }
-    } else {
-      toast.error(data.message || "Login failed");
-    }
-  },
-  onError: (error: any) => {
-    console.error('Login error:', error);
-    toast.error(error?.response?.data?.message || "Login failed");
-  },
-});
+    },
+    onError: (error: any) => {
+      console.error('Login error:', error);
+      toast.error(error?.response?.data?.message || "Login failed");
+    },
+  });
+
   // Handle register
   const handleRegister = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -144,7 +150,7 @@ const loginMutation = useMutation({
       lastName,
       userName: userName || `${firstName.toLowerCase()}${lastName.toLowerCase()}`,
       emailAddress,
-      password, // Use password, not registerPassword
+      password,
     };
 
     registerMutation.mutate(userData);
@@ -165,8 +171,6 @@ const loginMutation = useMutation({
 
     loginMutation.mutate(loginData);
   };
-
- 
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-gray-50 to-orange-50 p-4">
@@ -359,8 +363,6 @@ const loginMutation = useMutation({
               </form>
             </TabsContent>
           </Tabs>
-          
-          
         </Card>
       </div>
     </div>

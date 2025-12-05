@@ -13,6 +13,8 @@ export default defineConfig({
   server: {
     watch: {
       usePolling: true,
+      interval: 1000, // check every 1 second instead of very frequently
+    ignored: ['**/node_modules/**', '**/prisma/**', '**/logs/**', '**/backend/**'],
     },
     proxy: {
       // Proxy all /api requests to your backend

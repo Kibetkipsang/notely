@@ -7,16 +7,11 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubTrigger,
-  DropdownMenuSubContent,
 } from '@/components/ui/dropdown-menu';
 import useAuthStore from '../stores/useAuthStore';
-import { useSettingsStore } from '../stores/useSettingsStore';
 import { 
   PenLine, Trash2, User, LogOut, Bell, Settings, FileText, 
-  Star, Pin, Clock, CheckCircle, Info, Sun, Moon, Globe, 
-  MoonIcon as MoonIconLucide, SunIcon as SunIconLucide 
+  Star, Pin, Clock, CheckCircle, Info
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -55,7 +50,6 @@ type ActivitiesResponse = {
 export const Header = () => {
   const user = useAuthStore(state => state.user);
   const clearUser = useAuthStore(state => state.clearUser);
-  const { settings, updateSettings } = useSettingsStore();
   const navigate = useNavigate();
   
   // Local state for immediate UI updates
@@ -63,30 +57,54 @@ export const Header = () => {
   const [localUnreadCount, setLocalUnreadCount] = useState(0);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  // Fetch user's real activities from API
-  const { data: activitiesResponse, refetch: refetchActivities } = useQuery<ActivitiesResponse>({
-    queryKey: ['activities'],
+  // 🔴 FIXED: Safe activities fetch - handles 401 gracefully
+  const { data: activitiesResponse, refetch: refetchActivities, isLoading: activitiesLoading } = useQuery<ActivitiesResponse>({
+    queryKey: ['activities', user?.id], // Include user.id in query key
     queryFn: async () => {
+      // 🚨 Don't fetch if no user
+      if (!user?.id) {
+        console.log('No user, skipping activities fetch');
+        return {
+          success: false,
+          data: [],
+          unreadCount: 0,
+          message: 'User not authenticated'
+        };
+      }
+      
       try {
         const response = await api.get('/activities', { 
           params: { limit: 10 } 
         });
         return response.data;
-      } catch (error) {
+      } catch (error: any) {
+        // 🚨 Handle 401 gracefully - don't throw error
+        if (error.response?.status === 401) {
+          console.log('Not authenticated for activities');
+          return {
+            success: false,
+            data: [],
+            unreadCount: 0,
+            message: 'Authentication required'
+          };
+        }
+        
         console.error('Error fetching activities:', error);
         return {
           success: false,
           data: [],
-          unreadCount: 0
+          unreadCount: 0,
+          message: error?.response?.data?.message || 'Failed to fetch activities'
         };
       }
     },
-    enabled: !!user,
-    refetchOnWindowFocus: true,
-    staleTime: 30000, // 30 seconds
+    enabled: !!user?.id, // 🚨 CRITICAL: Only enable if user exists
+    retry: false, // 🚨 Don't retry on error
+    refetchOnWindowFocus: false, // 🚨 Disable auto-refresh on focus
+    staleTime: 60000, // 1 minute
   });
 
-  // Mutation for marking all as read
+  // 🔴 FIXED: Safe mutation for marking all as read
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
       const response = await api.patch('/activities/read-all');
@@ -103,11 +121,15 @@ export const Header = () => {
       toast.success('All notifications marked as read');
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to mark all as read');
+      console.error('Error marking all as read:', error);
+      // 🚨 Don't show toast for 401 - user might be logged out
+      if (error.response?.status !== 401) {
+        toast.error(error?.response?.data?.message || 'Failed to mark all as read');
+      }
     }
   });
 
-  // Mutation for marking single activity as read
+  // 🔴 FIXED: Safe mutation for marking single activity as read
   const markAsReadMutation = useMutation({
     mutationFn: async (activityId: string) => {
       const response = await api.patch(`/activities/${activityId}/read`);
@@ -122,7 +144,11 @@ export const Header = () => {
       setLocalUnreadCount(prev => Math.max(0, prev - 1));
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || 'Failed to mark as read');
+      console.error('Error marking as read:', error);
+      // 🚨 Don't show toast for 401
+      if (error.response?.status !== 401) {
+        toast.error(error?.response?.data?.message || 'Failed to mark as read');
+      }
     }
   });
 
@@ -131,6 +157,10 @@ export const Header = () => {
     if (activitiesResponse?.data) {
       setLocalActivities(activitiesResponse.data);
       setLocalUnreadCount(activitiesResponse.unreadCount || 0);
+    } else {
+      // 🚨 Reset if no data or error
+      setLocalActivities([]);
+      setLocalUnreadCount(0);
     }
   }, [activitiesResponse]);
 
@@ -150,7 +180,10 @@ export const Header = () => {
   };
 
   const handleMarkAllAsRead = () => {
-    markAllAsReadMutation.mutate();
+    // 🚨 Only mark as read if we have activities
+    if (localActivities.length > 0) {
+      markAllAsReadMutation.mutate();
+    }
     setIsDropdownOpen(false);
   };
 
@@ -179,38 +212,38 @@ export const Header = () => {
   const getActivityIcon = (type: string, action: string) => {
     // Note activities
     if (type === 'note_created') {
-      return <FileText className="h-4 w-4 text-green-600 dark:text-green-400" />;
+      return <FileText className="h-4 w-4 text-green-600" />;
     }
     if (type === 'note_updated') {
-      if (action === 'pinned') return <Pin className="h-4 w-4 text-orange-600 dark:text-orange-400" />;
-      if (action === 'favorited') return <Star className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />;
-      return <PenLine className="h-4 w-4 text-blue-600 dark:text-blue-400" />;
+      if (action === 'pinned') return <Pin className="h-4 w-4 text-orange-600" />;
+      if (action === 'favorited') return <Star className="h-4 w-4 text-yellow-600" />;
+      return <PenLine className="h-4 w-4 text-blue-600" />;
     }
     if (type === 'note_deleted') {
-      return <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />;
+      return <Trash2 className="h-4 w-4 text-red-600" />;
     }
     if (type === 'note_restored') {
-      return <Clock className="h-4 w-4 text-green-600 dark:text-green-400" />;
+      return <Clock className="h-4 w-4 text-green-600" />;
     }
     if (type === 'note_permanently_deleted') {
-      return <Trash2 className="h-4 w-4 text-red-700 dark:text-red-500" />;
+      return <Trash2 className="h-4 w-4 text-red-700" />;
     }
     
     // System activities
     if (type === 'trash_emptied') {
-      return <Trash2 className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
+      return <Trash2 className="h-4 w-4 text-gray-600" />;
     }
     if (type === 'system') {
-      return <Info className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
+      return <Info className="h-4 w-4 text-gray-600" />;
     }
     
     // Default
-    return <Bell className="h-4 w-4 text-gray-600 dark:text-gray-400" />;
+    return <Bell className="h-4 w-4 text-gray-600" />;
   };
 
   const handleDropdownOpenChange = (open: boolean) => {
     setIsDropdownOpen(open);
-    if (open) {
+    if (open && user?.id) {
       // Refetch when dropdown opens to get latest data
       refetchActivities();
     }
@@ -244,44 +277,8 @@ export const Header = () => {
   const unreadCount = localUnreadCount;
   const hasActivities = localActivities.length > 0;
 
-  // Handle dark mode toggle
-  const handleDarkModeToggle = () => {
-    const newDarkMode = !settings?.darkMode;
-    updateSettings({ darkMode: newDarkMode })
-      .then(() => {
-        toast.success(newDarkMode ? 'Dark mode enabled' : 'Light mode enabled');
-      })
-      .catch((error) => {
-        toast.error('Failed to update theme');
-        console.error('Dark mode toggle error:', error);
-      });
-  };
-
-  // Handle language change
-  const handleLanguageChange = (language: string) => {
-    updateSettings({ language })
-      .then(() => {
-        toast.success(`Language changed to ${getLanguageName(language)}`);
-      })
-      .catch((error) => {
-        toast.error('Failed to update language');
-        console.error('Language change error:', error);
-      });
-  };
-
-  // Get language display name
-  const getLanguageName = (code: string) => {
-    const languages: Record<string, string> = {
-      'en': 'English',
-      'es': 'Spanish',
-      'fr': 'French',
-      'de': 'German',
-    };
-    return languages[code] || code.toUpperCase();
-  };
-
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-gray-200 dark:border-gray-800 bg-white/95 dark:bg-gray-900/95 backdrop-blur-sm supports-[backdrop-filter]:bg-white/60 dark:supports-[backdrop-filter]:bg-gray-900/60">
+    <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 backdrop-blur-sm supports-[backdrop-filter]:bg-white/60">
       <div className="container mx-auto flex h-16 items-center justify-between px-4">
         
         <Link to="/dashboard" className="flex items-center space-x-2 group">
@@ -301,7 +298,7 @@ export const Header = () => {
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate('/dashboard')}
-                className="hidden sm:flex text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-800"
+                className="hidden sm:flex text-gray-700 hover:text-orange-500 hover:bg-orange-50"
               >
                 <PenLine className="mr-2 h-4 w-4" />
                 Dashboard
@@ -311,7 +308,7 @@ export const Header = () => {
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate('/notes')}
-                className="hidden sm:flex text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-800"
+                className="hidden sm:flex text-gray-700 hover:text-orange-500 hover:bg-orange-50"
               >
                 <FileText className="mr-2 h-4 w-4" />
                 Notes
@@ -321,29 +318,12 @@ export const Header = () => {
                 variant="ghost"
                 size="sm"
                 onClick={() => navigate('/trash')}
-                className="hidden sm:flex text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-800"
+                className="hidden sm:flex text-gray-700 hover:text-orange-500 hover:bg-orange-50"
               >
                 <Trash2 className="mr-2 h-4 w-4" />
                 Trash
               </Button>
             </>
-          )}
-
-          {/* Theme Toggle Button - only show if user is logged in */}
-          {user && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={handleDarkModeToggle}
-              className="rounded-full hover:bg-orange-50 dark:hover:bg-gray-800 transition-all"
-              title={settings?.darkMode ? "Switch to light mode" : "Switch to dark mode"}
-            >
-              {settings?.darkMode ? (
-                <SunIconLucide className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-              ) : (
-                <MoonIconLucide className="h-5 w-5 text-gray-700 dark:text-gray-300" />
-              )}
-            </Button>
           )}
 
           {/* Notifications Dropdown - only show if user is logged in */}
@@ -353,36 +333,42 @@ export const Header = () => {
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="relative rounded-full hover:bg-orange-50 dark:hover:bg-gray-800 transition-all"
-                  disabled={markAllAsReadMutation.isPending}
+                  className="relative rounded-full hover:bg-orange-50 transition-all"
+                  disabled={markAllAsReadMutation.isPending || activitiesLoading}
                 >
-                  <Bell className={`h-5 w-5 ${unreadCount > 0 ? 'text-orange-600 dark:text-orange-400' : 'text-gray-700 dark:text-gray-300'}`} />
-                  {unreadCount > 0 && (
-                    <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-r from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 text-xs font-bold text-white border-2 border-white dark:border-gray-800 shadow-sm animate-pulse">
-                      {unreadCount > 9 ? '9+' : unreadCount}
-                    </span>
+                  {activitiesLoading ? (
+                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-orange-600 border-t-transparent" />
+                  ) : (
+                    <>
+                      <Bell className={`h-5 w-5 ${unreadCount > 0 ? 'text-orange-600' : 'text-gray-700'}`} />
+                      {unreadCount > 0 && (
+                        <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-gradient-to-r from-orange-500 to-orange-600 text-xs font-bold text-white border-2 border-white shadow-sm animate-pulse">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                      )}
+                    </>
                   )}
                 </Button>
               </DropdownMenuTrigger>
               
               <DropdownMenuContent 
                 align="end" 
-                className="w-80 bg-white dark:bg-gray-800 border-orange-200 dark:border-gray-700 shadow-xl animate-in slide-in-from-top-2 duration-200"
+                className="w-80 bg-white border-orange-200 shadow-xl animate-in slide-in-from-top-2 duration-200"
                 onCloseAutoFocus={(e) => e.preventDefault()}
               >
-                <div className="p-4 border-b border-orange-100 dark:border-gray-700">
+                <div className="p-4 border-b border-orange-100">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-gray-900 dark:text-white">Recent Activity</h3>
+                    <h3 className="font-semibold text-gray-900">Recent Activity</h3>
                     {unreadCount > 0 && (
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={handleMarkAllAsRead}
                         disabled={markAllAsReadMutation.isPending}
-                        className="text-xs text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-gray-700 transition-all"
+                        className="text-xs text-orange-600 hover:text-orange-700 hover:bg-orange-50 transition-all"
                       >
                         {markAllAsReadMutation.isPending ? (
-                          <div className="h-3 w-3 animate-spin rounded-full border-2 border-orange-600 dark:border-orange-400 border-t-transparent" />
+                          <div className="h-3 w-3 animate-spin rounded-full border-2 border-orange-600 border-t-transparent" />
                         ) : (
                           <CheckCircle className="h-3 w-3 mr-1" />
                         )}
@@ -390,7 +376,7 @@ export const Header = () => {
                       </Button>
                     )}
                   </div>
-                  <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+                  <p className="text-sm text-gray-500 mt-1">
                     {hasActivities 
                       ? `${localActivities.length} recent activit${localActivities.length !== 1 ? 'ies' : 'y'}`
                       : 'No recent activity'
@@ -405,8 +391,8 @@ export const Header = () => {
                       <div
                         key={activity.id}
                         onClick={() => handleActivityClick(activity)}
-                        className={`flex items-start gap-3 p-3 cursor-pointer transition-all hover:bg-orange-50 dark:hover:bg-gray-700 active:bg-orange-100 dark:active:bg-gray-600 ${
-                          !activity.read ? 'bg-orange-50/50 dark:bg-gray-800/50' : ''
+                        className={`flex items-start gap-3 p-3 cursor-pointer transition-all hover:bg-orange-50 active:bg-orange-100 ${
+                          !activity.read ? 'bg-orange-50/50' : ''
                         }`}
                       >
                         <div className="mt-0.5 flex-shrink-0">
@@ -414,45 +400,45 @@ export const Header = () => {
                         </div>
                         <div className="flex-1 space-y-1 min-w-0">
                           <div className="flex items-start justify-between gap-2">
-                            <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                            <p className="text-sm font-medium text-gray-900 truncate">
                               {activity.title}
                             </p>
                             {!activity.read && (
                               <button
                                 onClick={(e) => handleMarkAsRead(activity.id, e)}
                                 disabled={markAsReadMutation.isPending}
-                                className="flex-shrink-0 text-xs text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 opacity-0 group-hover:opacity-100 transition-opacity"
+                                className="flex-shrink-0 text-xs text-orange-600 hover:text-orange-700 opacity-0 group-hover:opacity-100 transition-opacity"
                                 title="Mark as read"
                               >
                                 {markAsReadMutation.isPending && markAsReadMutation.variables === activity.id ? (
-                                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-orange-600 dark:border-orange-400 border-t-transparent" />
+                                  <div className="h-3 w-3 animate-spin rounded-full border-2 border-orange-600 border-t-transparent" />
                                 ) : (
                                   '✓'
                                 )}
                               </button>
                             )}
                           </div>
-                          <p className="text-xs text-gray-500 dark:text-gray-400 line-clamp-2">
+                          <p className="text-xs text-gray-500 line-clamp-2">
                             {getActivityContent(activity)}
                           </p>
-                          <p className="text-xs text-gray-400 dark:text-gray-500">
+                          <p className="text-xs text-gray-400">
                             {formatDistanceToNow(new Date(activity.createdAt), { addSuffix: true })}
                           </p>
                         </div>
                         {!activity.read && (
-                          <div className="h-2 w-2 rounded-full bg-orange-500 dark:bg-orange-400 flex-shrink-0 mt-1.5 animate-pulse" />
+                          <div className="h-2 w-2 rounded-full bg-orange-500 flex-shrink-0 mt-1.5 animate-pulse" />
                         )}
                       </div>
                     ))
                   ) : (
                     <div className="p-8 text-center">
-                      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-orange-100 dark:bg-orange-900/30">
-                        <Bell className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                      <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-orange-100">
+                        <Bell className="h-6 w-6 text-orange-600" />
                       </div>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">
-                        No recent activity
+                      <p className="text-sm text-gray-500">
+                        {activitiesLoading ? 'Loading activities...' : 'No recent activity'}
                       </p>
-                      <p className="text-xs text-gray-400 dark:text-gray-500 mt-1">
+                      <p className="text-xs text-gray-400 mt-1">
                         Your activities will appear here
                       </p>
                     </div>
@@ -460,7 +446,7 @@ export const Header = () => {
                 </div>
                 
                 {hasActivities && activitiesResponse?.pagination?.hasNextPage && (
-                  <div className="p-2 border-t border-orange-100 dark:border-gray-700">
+                  <div className="p-2 border-t border-orange-100">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -468,7 +454,7 @@ export const Header = () => {
                         navigate('/activities');
                         setIsDropdownOpen(false);
                       }}
-                      className="w-full justify-center text-orange-600 dark:text-orange-400 hover:text-orange-700 dark:hover:text-orange-300 hover:bg-orange-50 dark:hover:bg-gray-700"
+                      className="w-full justify-center text-orange-600 hover:text-orange-700 hover:bg-orange-50"
                     >
                       <FileText className="h-3 w-3 mr-2" />
                       View all activities
@@ -486,7 +472,7 @@ export const Header = () => {
                 <Button 
                   variant="ghost" 
                   size="icon" 
-                  className="rounded-full hover:bg-orange-50 dark:hover:bg-gray-800 border border-orange-100 dark:border-gray-700 transition-all"
+                  className="rounded-full hover:bg-orange-50 border border-orange-100 transition-all"
                 >
                   <Avatar className="h-9 w-9">
                     <AvatarFallback className="bg-gradient-to-r from-orange-400 to-orange-500 text-white font-semibold shadow-sm">
@@ -496,25 +482,25 @@ export const Header = () => {
                 </Button>
               </DropdownMenuTrigger>
               
-              <DropdownMenuContent align="end" className="w-64 bg-white dark:bg-gray-800 border-orange-200 dark:border-gray-700 shadow-lg animate-in slide-in-from-top-2 duration-200">
+              <DropdownMenuContent align="end" className="w-64 bg-white border-orange-200 shadow-lg animate-in slide-in-from-top-2 duration-200">
                 {/* User Info */}
                 <div className="flex items-center gap-3 p-4">
-                  <Avatar className="h-12 w-12 border-2 border-orange-100 dark:border-gray-700">
+                  <Avatar className="h-12 w-12 border-2 border-orange-100">
                     <AvatarFallback className="bg-gradient-to-r from-orange-400 to-orange-500 text-white text-lg">
                       {getInitials()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col overflow-hidden">
-                    <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                    <p className="text-sm font-semibold text-gray-900 truncate">
                       {user?.firstName} {user?.lastName}
                     </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                    <p className="text-xs text-gray-500 truncate">
                       {user?.emailAddress}
                     </p>
                     {unreadCount > 0 && (
                       <div className="mt-1 flex items-center gap-2">
-                        <div className="h-2 w-2 rounded-full bg-orange-500 dark:bg-orange-400 animate-pulse" />
-                        <span className="text-xs text-orange-600 dark:text-orange-400 font-medium">
+                        <div className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+                        <span className="text-xs text-orange-600 font-medium">
                           {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
                         </span>
                       </div>
@@ -522,12 +508,12 @@ export const Header = () => {
                   </div>
                 </div>
                 
-                <DropdownMenuSeparator className="bg-orange-100 dark:bg-gray-700" />
+                <DropdownMenuSeparator className="bg-orange-100" />
                 
                 {/* Menu Items */}
                 <DropdownMenuItem 
                   onClick={() => navigate('/dashboard')}
-                  className="cursor-pointer text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-700 focus:text-orange-500 focus:bg-orange-50"
+                  className="cursor-pointer text-gray-700 hover:text-orange-500 hover:bg-orange-50 focus:text-orange-500 focus:bg-orange-50"
                 >
                   <User className="mr-2 h-4 w-4" />
                   <span>Dashboard</span>
@@ -535,7 +521,7 @@ export const Header = () => {
                 
                 <DropdownMenuItem 
                   onClick={() => navigate('/dashboard?tab=profile')}
-                  className="cursor-pointer text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-700 focus:text-orange-500 focus:bg-orange-50"
+                  className="cursor-pointer text-gray-700 hover:text-orange-500 hover:bg-orange-50 focus:text-orange-500 focus:bg-orange-50"
                 >
                   <User className="mr-2 h-4 w-4" />
                   <span>Profile</span>
@@ -543,63 +529,18 @@ export const Header = () => {
                 
                 <DropdownMenuItem 
                   onClick={() => navigate('/dashboard?tab=settings')}
-                  className="cursor-pointer text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-700 focus:text-orange-500 focus:bg-orange-50"
+                  className="cursor-pointer text-gray-700 hover:text-orange-500 hover:bg-orange-50 focus:text-orange-500 focus:bg-orange-50"
                 >
                   <Settings className="mr-2 h-4 w-4" />
                   <span>Settings</span>
                 </DropdownMenuItem>
                 
-                {/* Theme Toggle in Dropdown */}
-                <DropdownMenuItem 
-                  onClick={handleDarkModeToggle}
-                  className="cursor-pointer text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-700 focus:text-orange-500 focus:bg-orange-50"
-                >
-                  {settings?.darkMode ? (
-                    <SunIconLucide className="mr-2 h-4 w-4" />
-                  ) : (
-                    <MoonIconLucide className="mr-2 h-4 w-4" />
-                  )}
-                  <span>{settings?.darkMode ? 'Light Mode' : 'Dark Mode'}</span>
-                </DropdownMenuItem>
-                
-                {/* Language Selector */}
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger className="cursor-pointer text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-700 focus:text-orange-500 focus:bg-orange-50">
-                    <Globe className="mr-2 h-4 w-4" />
-                    <span>Language ({getLanguageName(settings?.language || 'en')})</span>
-                  </DropdownMenuSubTrigger>
-                  <DropdownMenuSubContent className="bg-white dark:bg-gray-800 border-orange-200 dark:border-gray-700">
-                    <DropdownMenuItem 
-                      onClick={() => handleLanguageChange('en')}
-                      className="cursor-pointer text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-700"
-                    >
-                      English
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => handleLanguageChange('es')}
-                      className="cursor-pointer text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-700"
-                    >
-                      Español
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => handleLanguageChange('fr')}
-                      className="cursor-pointer text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-700"
-                    >
-                      Français
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => handleLanguageChange('de')}
-                      className="cursor-pointer text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-700"
-                    >
-                      Deutsch
-                    </DropdownMenuItem>
-                  </DropdownMenuSubContent>
-                </DropdownMenuSub>
+                <DropdownMenuSeparator className="bg-orange-100 sm:hidden" />
                 
                 {/* Mobile-only menu items */}
                 <DropdownMenuItem 
                   onClick={() => navigate('/notes')} 
-                  className="cursor-pointer text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-700 focus:text-orange-500 focus:bg-orange-50 sm:hidden"
+                  className="cursor-pointer text-gray-700 hover:text-orange-500 hover:bg-orange-50 focus:text-orange-500 focus:bg-orange-50 sm:hidden"
                 >
                   <FileText className="mr-2 h-4 w-4" />
                   <span>Notes</span>
@@ -607,17 +548,17 @@ export const Header = () => {
                 
                 <DropdownMenuItem 
                   onClick={() => navigate('/trash')} 
-                  className="cursor-pointer text-gray-700 dark:text-gray-300 hover:text-orange-500 dark:hover:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-700 focus:text-orange-500 focus:bg-orange-50 sm:hidden"
+                  className="cursor-pointer text-gray-700 hover:text-orange-500 hover:bg-orange-50 focus:text-orange-500 focus:bg-orange-50 sm:hidden"
                 >
                   <Trash2 className="mr-2 h-4 w-4" />
                   <span>Trash</span>
                 </DropdownMenuItem>
                 
-                <DropdownMenuSeparator className="bg-orange-100 dark:bg-gray-700 sm:hidden" />
+                <DropdownMenuSeparator className="bg-orange-100" />
                 
                 <DropdownMenuItem 
                   onClick={handleLogout}
-                  className="cursor-pointer text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 focus:text-red-700 focus:bg-red-50"
+                  className="cursor-pointer text-red-600 hover:text-red-700 hover:bg-red-50 focus:text-red-700 focus:bg-red-50"
                 >
                   <LogOut className="mr-2 h-4 w-4" />
                   <span>Sign out</span>
@@ -629,13 +570,13 @@ export const Header = () => {
               <Button
                 onClick={() => navigate('/auth?tab=login')}
                 variant="outline"
-                className="border-orange-300 dark:border-orange-700 text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-gray-800 hover:text-orange-700 dark:hover:text-orange-300 transition-all"
+                className="border-orange-300 text-orange-600 hover:bg-orange-50 hover:text-orange-700 transition-all"
               >
                 Sign In
               </Button>
               <Button
                 onClick={() => navigate('/auth?tab=register')}
-                className="bg-gradient-to-r from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 hover:from-orange-600 hover:to-orange-700 dark:hover:from-orange-700 dark:hover:to-orange-800 text-white shadow-sm hover:shadow-md transition-all"
+                className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white shadow-sm hover:shadow-md transition-all"
               >
                 Sign Up
               </Button>
