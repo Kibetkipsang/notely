@@ -1,6 +1,6 @@
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Edit, Trash2, Eye, MoreVertical, Loader2, Star, Pin, PinOff, StarOff } from 'lucide-react';
+import { Edit, Trash2, Eye, MoreVertical, Loader2, Star, Pin, PinOff, StarOff, Bookmark, BookmarkX } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useState } from 'react';
 
-// Update the NoteType import or define it locally
+// Update the NoteType interface to include bookmark fields
 interface NoteType {
   id: string;
   title: string;
@@ -21,6 +21,8 @@ interface NoteType {
   userId: string;
   isPinned?: boolean;
   isFavorite?: boolean;
+  bookmarked?: boolean;
+  bookmarkedAt?: Date | string;
 }
 
 interface NoteCardProps {
@@ -30,9 +32,11 @@ interface NoteCardProps {
   onView: (id: string) => void;
   onTogglePin?: (id: string, isPinned: boolean) => void;
   onToggleFavorite?: (id: string, isFavorite: boolean) => void;
+  onToggleBookmark?: (id: string, bookmarked: boolean) => void; // NEW
   isDeleting?: boolean;
   showPinButton?: boolean;
   showFavoriteButton?: boolean;
+  showBookmarkButton?: boolean; // NEW
 }
 
 export default function NoteCard({ 
@@ -42,12 +46,15 @@ export default function NoteCard({
   onView, 
   onTogglePin,
   onToggleFavorite,
+  onToggleBookmark, // NEW
   isDeleting = false,
   showPinButton = true,
-  showFavoriteButton = true
+  showFavoriteButton = true,
+  showBookmarkButton = true // NEW
 }: NoteCardProps) {
   const [isPinning, setIsPinning] = useState(false);
   const [isFavoriting, setIsFavoriting] = useState(false);
+  const [isBookmarking, setIsBookmarking] = useState(false); // NEW
   
   const handleDelete = () => {
     if (!isDeleting) {
@@ -80,6 +87,20 @@ export default function NoteCard({
       setIsFavoriting(false);
     }
   };
+
+  // NEW: Handle bookmark toggle
+  const handleToggleBookmark = async () => {
+    if (!onToggleBookmark) return;
+    
+    setIsBookmarking(true);
+    try {
+      await onToggleBookmark(note.id, note.bookmarked || false);
+    } catch (error) {
+      console.error('Failed to toggle bookmark:', error);
+    } finally {
+      setIsBookmarking(false);
+    }
+  };
   
   const formatDate = (date: Date | string) => {
     return new Date(date).toLocaleDateString('en-US', {
@@ -100,6 +121,7 @@ export default function NoteCard({
       group hover:shadow-medium rounded-md transition-all duration-200 animate-fade-in 
       border-orange-200 hover:border-orange-400 bg-white hover:bg-orange-50
       ${note.isPinned ? 'border-l-4 border-l-orange-500' : ''}
+      ${note.bookmarked ? 'border-r-4 border-r-blue-500' : ''}
     `}>
       <CardHeader className="pb-3">
         <div className="flex items-start justify-between">
@@ -107,6 +129,9 @@ export default function NoteCard({
             <CardTitle className="text-lg font-semibold line-clamp-1 text-gray-800 group-hover:text-orange-600 transition-colors duration-200">
               {note.isPinned && (
                 <Pin className="inline-block h-4 w-4 mr-2 text-orange-500" />
+              )}
+              {note.bookmarked && (
+                <Bookmark className="inline-block h-4 w-4 mr-2 text-blue-500" />
               )}
               {note.title}
             </CardTitle>
@@ -149,13 +174,31 @@ export default function NoteCard({
               </button>
             )}
             
+            {/* Bookmark button - NEW */}
+            {showBookmarkButton && onToggleBookmark && (
+              <button
+                onClick={handleToggleBookmark}
+                disabled={isBookmarking || isDeleting}
+                className="p-1.5 hover:bg-blue-100 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title={note.bookmarked ? "Remove bookmark" : "Bookmark note"}
+              >
+                {isBookmarking ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                ) : note.bookmarked ? (
+                  <Bookmark className="h-4 w-4 fill-blue-500 text-blue-600" />
+                ) : (
+                  <BookmarkX className="h-4 w-4 text-gray-400 hover:text-blue-500" />
+                )}
+              </button>
+            )}
+            
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button 
                   variant="ghost" 
                   size="sm" 
                   className="h-8 w-8 p-0 opacity-0 group-hover:opacity-100 transition-opacity hover:bg-orange-100"
-                  disabled={isDeleting || isPinning || isFavoriting}
+                  disabled={isDeleting || isPinning || isFavoriting || isBookmarking}
                 >
                   <MoreVertical className="h-4 w-4 text-gray-500" />
                 </Button>
@@ -216,6 +259,26 @@ export default function NoteCard({
                   </DropdownMenuItem>
                 )}
                 
+                {/* Bookmark option in dropdown - NEW */}
+                {showBookmarkButton && onToggleBookmark && (
+                  <DropdownMenuItem 
+                    onClick={handleToggleBookmark}
+                    disabled={isBookmarking}
+                    className="cursor-pointer hover:bg-blue-50 focus:bg-blue-50"
+                  >
+                    {isBookmarking ? (
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin text-blue-500" />
+                    ) : note.bookmarked ? (
+                      <BookmarkX className="mr-2 h-4 w-4 text-blue-600" />
+                    ) : (
+                      <Bookmark className="mr-2 h-4 w-4 text-gray-500" />
+                    )}
+                    <span className="text-gray-700">
+                      {note.bookmarked ? 'Remove Bookmark' : 'Add to Bookmarks'}
+                    </span>
+                  </DropdownMenuItem>
+                )}
+                
                 <DropdownMenuItem 
                   onClick={handleDelete} 
                   className="cursor-pointer text-red-600 hover:bg-red-50 focus:bg-red-50 focus:text-red-600"
@@ -250,47 +313,52 @@ export default function NoteCard({
         </p>
       </CardContent>
       
-      <CardFooter className="flex justify-between pt-3 border-t border-orange-100">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-orange-600 font-medium">
-            Updated {formatDate(note.updatedAt)}
+      <CardFooter className="flex justify-between items-center pt-3 border-t border-orange-100">
+  <div className="flex flex-col gap-1 min-w-0">
+    <span className="text-xs text-orange-600 font-medium whitespace-nowrap">
+      Updated {formatDate(note.updatedAt)}
+    </span>
+    {(note.isPinned || note.isFavorite || note.bookmarked) && (
+      <div className="flex gap-1 flex-wrap">
+        {note.isPinned && (
+          <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full whitespace-nowrap">
+            Pinned
           </span>
-          {(note.isPinned || note.isFavorite) && (
-            <div className="flex gap-1">
-              {note.isPinned && (
-                <span className="text-xs px-2 py-0.5 bg-orange-100 text-orange-700 rounded-full">
-                  Pinned
-                </span>
-              )}
-              {note.isFavorite && (
-                <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full">
-                  Favorite
-                </span>
-              )}
-            </div>
-          )}
-        </div>
-        <div className="flex gap-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onView(note.id)}
-            className="h-8 text-xs bg-orange-500 hover:bg-orange-600 text-white border-orange-200"
-            disabled={isDeleting || isPinning || isFavoriting}
-          >
-            View
-          </Button>
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => onEdit(note.id)}
-            className="h-8 text-xs bg-orange-500 hover:bg-orange-600 text-white border-orange-200"
-            disabled={isDeleting || isPinning || isFavoriting}
-          >
-            Edit
-          </Button>
-        </div>
-      </CardFooter>
+        )}
+        {note.isFavorite && (
+          <span className="text-xs px-2 py-0.5 bg-yellow-100 text-yellow-700 rounded-full whitespace-nowrap">
+            Favorite
+          </span>
+        )}
+        {note.bookmarked && (
+          <span className="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full whitespace-nowrap">
+            Bookmarked
+          </span>
+        )}
+      </div>
+    )}
+  </div>
+  <div className="flex gap-1 shrink-0 ml-2">
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => onView(note.id)}
+      className="h-8 text-xs bg-orange-500 hover:bg-orange-600 text-white border-orange-200 hover:text-white"
+      disabled={isDeleting || isPinning || isFavoriting || isBookmarking}
+    >
+      View
+    </Button>
+    <Button
+      variant="ghost"
+      size="sm"
+      onClick={() => onEdit(note.id)}
+      className="h-8 text-xs bg-orange-500 hover:bg-orange-600 text-white border-orange-200 hover:text-white"
+      disabled={isDeleting || isPinning || isFavoriting || isBookmarking}
+    >
+      Edit
+    </Button>
+  </div>
+</CardFooter>
     </Card>
   );
 }

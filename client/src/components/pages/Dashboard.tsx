@@ -284,7 +284,7 @@ export default function Dashboard() {
 
           {/* Tabs for different sections */}
           <Tabs defaultValue="profile" className="space-y-6">
-            <TabsList className="grid grid-cols-3 lg:grid-cols-5 bg-gray-100">
+            <TabsList className="grid grid-cols-3 lg:grid-cols-3 bg-gray-100">
               <TabsTrigger value="profile" className="flex items-center gap-2 data-[state=active]:bg-white">
                 <User className="h-4 w-4" />
                 <span className="hidden lg:inline">Profile</span>
@@ -292,15 +292,7 @@ export default function Dashboard() {
               <TabsTrigger value="security" className="flex items-center gap-2 data-[state=active]:bg-white">
                 <Shield className="h-4 w-4" />
                 <span className="hidden lg:inline">Security</span>
-              </TabsTrigger>
-              <TabsTrigger value="settings" className="flex items-center gap-2 data-[state=active]:bg-white">
-                <Bell className="h-4 w-4" />
-                <span className="hidden lg:inline">Settings</span>
-              </TabsTrigger>
-              <TabsTrigger value="notifications" className="flex items-center gap-2 data-[state=active]:bg-white">
-                <Bell className="h-4 w-4" />
-                <span className="hidden lg:inline">Notifications</span>
-              </TabsTrigger>
+              </TabsTrigger>    
               <TabsTrigger value="account" className="flex items-center gap-2 data-[state=active]:bg-white">
                 <Globe className="h-4 w-4" />
                 <span className="hidden lg:inline">Account</span>
@@ -441,167 +433,7 @@ export default function Dashboard() {
             </TabsContent>
 
             {/* Settings Tab */}
-            <TabsContent value="settings">
-              <Card className="bg-white border-orange-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-gray-800">
-                    <Bell className="h-5 w-5" />
-                    Preferences
-                  </CardTitle>
-                  <CardDescription className="text-gray-600">
-                    Customize your application preferences.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleSettingsUpdate} className="space-y-6">
-                    <div className="space-y-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">
-                          Language
-                        </label>
-                        <select
-                          value={settingsForm.language}
-                          onChange={(e) => setSettingsForm({...settingsForm, language: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-gray-800"
-                        >
-                          <option value="en">English</option>
-                          <option value="es">Spanish</option>
-                          <option value="fr">French</option>
-                          <option value="de">German</option>
-                        </select>
-                      </div>
-
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">
-                          Timezone
-                        </label>
-                        <select
-                          value={settingsForm.timezone}
-                          onChange={(e) => setSettingsForm({...settingsForm, timezone: e.target.value})}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-orange-500 bg-white text-gray-800"
-                        >
-                          <option value="UTC">UTC</option>
-                          <option value="EST">EST</option>
-                          <option value="PST">PST</option>
-                          <option value="CET">CET</option>
-                          <option value="GMT">GMT</option>
-                          <option value="CST">CST</option>
-                        </select>
-                      </div>
-
-                      <div className="flex items-center justify-between pt-4">
-                        <div>
-                          <h3 className="font-medium text-gray-800">Push Notifications</h3>
-                          <p className="text-sm text-gray-600">
-                            Receive push notifications in the browser
-                          </p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={settingsForm.pushNotifications}
-                            onChange={(e) => setSettingsForm({...settingsForm, pushNotifications: e.target.checked})}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
-                        </label>
-                      </div>
-
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <h3 className="font-medium text-gray-800">Sound Enabled</h3>
-                          <p className="text-sm text-gray-600">
-                            Enable sound notifications
-                          </p>
-                        </div>
-                        <label className="relative inline-flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={settingsForm.soundEnabled}
-                            onChange={(e) => setSettingsForm({...settingsForm, soundEnabled: e.target.checked})}
-                            className="sr-only peer"
-                          />
-                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
-                        </label>
-                      </div>
-                    </div>
-
-                    <div className="pt-4">
-                      <Button
-                        type="submit"
-                        disabled={updateSettingsMutation.isPending}
-                        className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
-                      >
-                        {updateSettingsMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Save className="h-4 w-4 mr-2" />
-                        )}
-                        Save Preferences
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* Notifications Tab */}
-            <TabsContent value="notifications">
-              <Card className="bg-white border-orange-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-gray-800">
-                    <Bell className="h-5 w-5" />
-                    Notification Settings
-                  </CardTitle>
-                  <CardDescription className="text-gray-600">
-                    Manage how you receive notifications.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-medium text-gray-800">Email Notifications</h3>
-                        <p className="text-sm text-gray-600">
-                          Receive updates and notifications via email
-                        </p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={settingsForm.emailNotifications}
-                          onChange={(e) => setSettingsForm({...settingsForm, emailNotifications: e.target.checked})}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-orange-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-orange-600"></div>
-                      </label>
-                    </div>
-
-                    <div className="pt-6">
-                      <h3 className="font-medium text-gray-800 mb-4">Notification Types</h3>
-                      <div className="space-y-3">
-                        {[
-                          { id: 'new_note', label: 'New note created', default: true },
-                          { id: 'note_updated', label: 'Note updated', default: true },
-                          { id: 'trash_cleared', label: 'Trash cleared', default: false },
-                          { id: 'weekly_summary', label: 'Weekly summary', default: true },
-                          { id: 'security_alerts', label: 'Security alerts', default: true },
-                        ].map((item) => (
-                          <div key={item.id} className="flex items-center justify-between">
-                            <span className="text-gray-700">{item.label}</span>
-                            <input
-                              type="checkbox"
-                              defaultChecked={item.default}
-                              className="h-4 w-4 text-orange-600 rounded border-gray-300 focus:ring-orange-500"
-                            />
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+            
 
             {/* Account Tab */}
             <TabsContent value="account">

@@ -12,7 +12,7 @@ import {
   Plus,
   ChevronRight,
   Pin,
-  Archive,
+  Bookmark,  // Added Bookmark icon
   Star,
   Folder
 } from 'lucide-react';
@@ -47,7 +47,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       path: '/notes',
       active: location.pathname === '/notes',
     },
-    
     {
       name: 'Pinned Notes',
       icon: <Pin className="h-5 w-5" />,
@@ -59,6 +58,12 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       icon: <Star className="h-5 w-5" />,
       path: '/favorites',
       active: location.pathname === '/favorites',
+    },
+    {
+      name: 'Bookmarks',
+      icon: <Bookmark className="h-5 w-5" />, // Changed from Star to Bookmark
+      path: '/bookmarks',
+      active: location.pathname === '/bookmarks',
     },
     {
       name: 'Trash',
@@ -73,7 +78,6 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
       name: 'Profile',
       icon: <User className="h-5 w-5" />,
       path: '/dashboard',
-      // active: location.pathname === '/dashboard',
     },
     {
       name: 'Settings',

@@ -1,6 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { Header } from './components/Header'
-import { SettingsInitializer } from './components/SettingsInitializer';
+
 import Auth from './components/Auth'
 import Landing from './components/Home'
 import Dashboard from './components/pages/Dashboard'
@@ -10,7 +10,7 @@ import Trash from './components/pages/Trash'
 import Favorites from './components/pages/Favourites'
 import Pinned from './components/pages/Pinned'
 import AllNotes from './components/pages/AllNotes'
-
+import Bookmarks from './components/pages/BookMarks'
 import './index.css'
 
 function App() {
@@ -30,6 +30,7 @@ function App() {
           <Route path='/trash' element={<Trash />} />
           <Route path='/favorites' element={<Favorites />} />
           <Route path='/pinned' element={<Pinned />} />
+          <Route path='/bookmarks' element={<Bookmarks />} />
         </Routes>
     
     </>

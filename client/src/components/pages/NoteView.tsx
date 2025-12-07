@@ -58,7 +58,7 @@ export default function NoteView() {
   };
 
   const handleBack = () => {
-    navigate('/dashboard');
+    navigate('/notes');
   };
 
   const handleEdit = () => {

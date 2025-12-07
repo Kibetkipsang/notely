@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import useAuthStore from '../../stores/useAuthStore';
@@ -21,6 +20,8 @@ type NoteType = {
   userId: string;
   isPinned?: boolean;
   isFavorite?: boolean;
+  bookmarked?: boolean; // ADD THIS
+  bookmarkedAt?: Date; // ADD THIS
 };
 
 export default function AllNotes() {
@@ -59,6 +60,7 @@ export default function AllNotes() {
       queryClient.invalidateQueries({ queryKey: ['notes'] });
       queryClient.invalidateQueries({ queryKey: ['favorites'] });
       queryClient.invalidateQueries({ queryKey: ['pinned'] });
+      queryClient.invalidateQueries({ queryKey: ['bookmarks'] }); // ADD THIS
       toast.success('Note moved to trash');
     },
     onError: (error: any) => {
@@ -77,6 +79,7 @@ export default function AllNotes() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notes'] });
       queryClient.invalidateQueries({ queryKey: ['pinned'] });
+      queryClient.invalidateQueries({ queryKey: ['bookmarks'] }); // ADD THIS
       toast.success('Note updated');
     },
     onError: (error: any) => {
@@ -95,10 +98,30 @@ export default function AllNotes() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['notes'] });
       queryClient.invalidateQueries({ queryKey: ['favorites'] });
+      queryClient.invalidateQueries({ queryKey: ['bookmarks'] }); // ADD THIS
       toast.success('Note updated');
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to update note');
+    },
+  });
+
+  // ADD THIS: Mutation for toggling bookmark status
+  const toggleBookmarkMutation = useMutation({
+    mutationFn: async ({ id, bookmarked }: { id: string; bookmarked: boolean }) => {
+      const response = await api.patch(`/notes/${id}/bookmark`, { 
+        bookmarked: !bookmarked 
+      });
+      return response.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['notes'] });
+      queryClient.invalidateQueries({ queryKey: ['bookmarks'] });
+      queryClient.invalidateQueries({ queryKey: ['favorites'] }); // OPTIONAL: if you want to update favorites too
+      toast.success('Bookmark updated');
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to update bookmark');
     },
   });
 
@@ -148,6 +171,11 @@ export default function AllNotes() {
 
   const handleToggleFavorite = (id: string, isFavorite: boolean) => {
     toggleFavoriteMutation.mutate({ id, isFavorite });
+  };
+
+  // ADD THIS: Handler for toggling bookmark
+  const handleToggleBookmark = (id: string, bookmarked: boolean) => {
+    toggleBookmarkMutation.mutate({ id, bookmarked });
   };
 
   const handlePageChange = (newPage: number) => {
@@ -299,9 +327,11 @@ export default function AllNotes() {
                         onView={() => navigate(`/notes/${note.id}`)}
                         onTogglePin={handleTogglePin}
                         onToggleFavorite={handleToggleFavorite}
+                        onToggleBookmark={handleToggleBookmark} // ADD THIS
                         isDeleting={deleteNoteMutation.isPending && deleteNoteMutation.variables === note.id}
                         showPinButton={true}
                         showFavoriteButton={true}
+                        showBookmarkButton={true} // ADD THIS
                       />
                     ))}
                   </div>
@@ -327,9 +357,11 @@ export default function AllNotes() {
                         onView={() => navigate(`/notes/${note.id}`)}
                         onTogglePin={handleTogglePin}
                         onToggleFavorite={handleToggleFavorite}
+                        onToggleBookmark={handleToggleBookmark} // ADD THIS
                         isDeleting={deleteNoteMutation.isPending && deleteNoteMutation.variables === note.id}
                         showPinButton={true}
                         showFavoriteButton={true}
+                        showBookmarkButton={true} // ADD THIS
                       />
                     ))}
                   </div>
