@@ -583,19 +583,14 @@ export const deleteAccount = async (req: Request, res: Response): Promise<void> 
       return;
     }
 
-    // IMPORTANT: In production, consider soft delete instead
-    // This will cascade delete notes and settings due to onDelete: Cascade
-    // await prisma.user.delete({
-    //   where: { id: userId },
-    // });
+    // Permanent deletion: delete user (cascade delete notes & settings)
+    await client.user.delete({
+      where: { id: userId },
+    });
 
-    // For now, return success without actually deleting
-    // You should implement proper account deletion logic
-    
     res.status(200).json({
       success: true,
-      message: 'Account deletion initiated. Your account and all data will be permanently deleted in 30 days.',
-      note: 'This feature is under development - actual deletion not performed',
+      message: 'Account and all associated data have been permanently deleted.',
     });
   } catch (error) {
     console.error('Delete account error:', error);
@@ -605,8 +600,6 @@ export const deleteAccount = async (req: Request, res: Response): Promise<void> 
     });
   }
 };
-
-
 
 // Cancel scheduled deletion
 export const cancelAccountDeletion = async (req: Request, res: Response): Promise<void> => {

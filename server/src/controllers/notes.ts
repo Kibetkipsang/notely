@@ -1213,3 +1213,116 @@ export const getBookmarkedNotes = async (req: Request, res: Response): Promise<v
     });
   }
 };
+
+// Soft Delete All Notes (Move all notes to trash)
+export const softDeleteAllNotes = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+
+    // Find all active notes for the user
+    const notesToSoftDelete = await prisma.note.findMany({
+      where: { userId, isDeleted: false },
+      select: { id: true, title: true },
+    });
+
+    if (notesToSoftDelete.length === 0) {
+      res.status(200).json({
+        success: true,
+        message: 'No notes to delete',
+        count: 0,
+      });
+      return;
+    }
+
+    // Soft delete all notes
+    const result = await prisma.note.updateMany({
+      where: { userId, isDeleted: false },
+      data: { isDeleted: true, deletedAt: new Date(), updatedAt: new Date() },
+    });
+
+    // Create activity
+    await ActivityService.createActivity(userId, {
+      type: 'notes_soft_deleted',
+      action: 'soft_deleted',
+      targetType: 'system',
+      title: 'All notes moved to trash',
+      message: `Soft-deleted ${result.count} notes`,
+      data: {
+        noteIds: notesToSoftDelete.map(note => note.id),
+        deletedAt: new Date().toISOString(),
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully moved ${result.count} notes to trash`,
+      count: result.count,
+    });
+  } catch (error) {
+    console.error('Soft delete all notes error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to soft delete all notes',
+    });
+  }
+};
+
+// Delete All Notes Permanently
+export const deleteAllNotes = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ success: false, error: 'Unauthorized' });
+      return;
+    }
+
+    // Find all notes (including soft-deleted)
+    const notesToDelete = await prisma.note.findMany({
+      where: { userId },
+      select: { id: true, title: true },
+    });
+
+    if (notesToDelete.length === 0) {
+      res.status(200).json({
+        success: true,
+        message: 'No notes to delete',
+        count: 0,
+      });
+      return;
+    }
+
+    // Delete all notes permanently
+    const result = await prisma.note.deleteMany({
+      where: { userId },
+    });
+
+    // Create activity
+    await ActivityService.createActivity(userId, {
+      type: 'notes_deleted_permanently',
+      action: 'deleted_permanently',
+      targetType: 'system',
+      title: 'All notes deleted permanently',
+      message: `Deleted ${result.count} notes permanently`,
+      data: {
+        noteIds: notesToDelete.map(note => note.id),
+        deletedAt: new Date().toISOString(),
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully deleted ${result.count} notes permanently`,
+      count: result.count,
+    });
+  } catch (error) {
+    console.error('Delete all notes error:', error);
+    res.status(500).json({
+      success: false,
+      error: 'Failed to delete all notes permanently',
+    });
+  }
+};

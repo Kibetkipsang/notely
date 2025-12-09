@@ -20,7 +20,9 @@ import {
   toggleBookmarkNote,   // ADD THIS
   getFavoriteNotes,     // ADD THIS
   getPinnedNotes,       // ADD THIS
-  getBookmarkedNotes    // ADD THIS
+  getBookmarkedNotes ,   // ADD THIS
+  deleteAllNotes,
+  softDeleteAllNotes
 } from './controllers/notes'; 
 import {
   getActivities,
@@ -32,6 +34,7 @@ import {
 } from './controllers/activities';
 import { getUserProfile, updatePassword, updateUserProfile, updateUserSettings,getUserSettings, deleteAccount } from './controllers/auth';
 import { authenticate } from './middlewares/checkUser'
+import { upload, uploadAvatar } from './controllers/users';
 
 
 dotenv.config();
@@ -65,6 +68,7 @@ app.put('/auth/password', authenticate, updatePassword);
 app.get('/auth/settings', authenticate, getUserSettings);
 app.put('/auth/settings', authenticate, updateUserSettings);
 app.delete('/auth/account', authenticate, deleteAccount);
+app.post('/avatar', authenticate, upload.single('avatar'), uploadAvatar);
 
 // Notes routes
 app.post('/notes/create', authenticate, createNote); 
@@ -82,8 +86,10 @@ app.post('/notes/:id/restore', authenticate, restoreNote);
 app.get('/notes/:id', authenticate, getNote);
 app.put('/notes/:id', authenticate, updateNote); 
 app.patch('/notes/:id/soft-delete', authenticate, softDeleteNote); 
+app.delete('/notes/all', authenticate, deleteAllNotes);
 app.delete('/notes/:id', authenticate, deleteNotePermanently);
 app.get('/notes', authenticate, getAllNotes);
+app.post('/notes/all/trash', authenticate, softDeleteAllNotes);
 
 // Activities Routes
 app.get('/activities', authenticate, getActivities);

@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../axios';
 import useAuthStore from '../../stores/useAuthStore';
 import Sidebar from './SideBar';
+import { DeleteConfirmationModal } from './DeleteModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,11 +19,13 @@ import {
   Loader2,
   Menu,
   Shield,
-  Bell,
   Globe,
   FileText,
   BarChart3,
-  Calendar
+  Calendar,
+  AlertTriangle,
+  Trash2,
+  Settings
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -31,23 +34,14 @@ export default function Dashboard() {
   const queryClient = useQueryClient();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  // Fetch user stats
-  const { data: statsData, isLoading: statsLoading } = useQuery({
-    queryKey: ['user-stats'],
-    queryFn: async () => {
-      const response = await api.get('/notes/stats');
-      return response.data;
-    },
-    enabled: !!user,
-  });
+  // Delete modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [deleteType, setDeleteType] = useState<'account' | 'notes'>('notes');
 
-  // Fetch user settings
-  const { data: settingsData, isLoading: settingsLoading } = useQuery({
-    queryKey: ['user-settings'],
-    queryFn: async () => {
-      const response = await api.get('/auth/settings');
-      return response.data;
-    },
+  // Fetch user stats
+  const { data: statsData } = useQuery({
+    queryKey: ['user-stats'],
+    queryFn: async () => (await api.get('/notes/stats')).data,
     enabled: !!user,
   });
 
@@ -58,7 +52,7 @@ export default function Dashboard() {
     emailAddress: '',
   });
 
-  // Initialize profile form when user data is available
+  // Initialize profile form
   useEffect(() => {
     if (user) {
       setProfileForm({
@@ -76,38 +70,12 @@ export default function Dashboard() {
     confirmPassword: '',
   });
 
-  // Settings form state - Initialize with defaults
-  const [settingsForm, setSettingsForm] = useState({
-    emailNotifications: true,
-    language: 'en',
-    timezone: 'UTC',
-    pushNotifications: true,
-    soundEnabled: true,
-  });
-
-  // Initialize settings form when settings data is available
-  useEffect(() => {
-    if (settingsData?.data) {
-      setSettingsForm({
-        emailNotifications: settingsData.data.emailNotifications ?? true,
-        language: settingsData.data.language ?? 'en',
-        timezone: settingsData.data.timezone ?? 'UTC',
-        pushNotifications: settingsData.data.pushNotifications ?? true,
-        soundEnabled: settingsData.data.soundEnabled ?? true,
-      });
-    }
-  }, [settingsData]);
-
   // Update profile mutation
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await api.put('/auth/profile', data);
-      return response.data;
-    },
+    mutationFn: async (data: any) => (await api.put('/auth/profile', data)).data,
     onSuccess: (data) => {
       setUser(data.user);
       toast.success('Profile updated successfully');
-      queryClient.invalidateQueries({ queryKey: ['user-settings'] });
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to update profile');
@@ -116,45 +84,57 @@ export default function Dashboard() {
 
   // Update password mutation
   const updatePasswordMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await api.put('/auth/password', data);
-      return response.data;
-    },
+    mutationFn: async (data: any) => (await api.put('/auth/password', data)).data,
     onSuccess: () => {
       toast.success('Password updated successfully');
-      setPasswordForm({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: '',
-      });
+      setPasswordForm({ currentPassword: '', newPassword: '', confirmPassword: '' });
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to update password');
     },
   });
 
-  // Update settings mutation
-  const updateSettingsMutation = useMutation({
-    mutationFn: async (data: any) => {
-      const response = await api.put('/auth/settings', data);
-      return response.data;
-    },
+  // Delete all notes mutation
+  const deleteAllNotesMutation = useMutation({
+    mutationFn: async () => (await api.delete('/notes/all')).data,
     onSuccess: (data) => {
-      toast.success('Settings updated successfully');
-      queryClient.invalidateQueries({ queryKey: ['user-settings'] });
+      toast.success(data.message || 'All notes deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['user-stats'] });
+      queryClient.invalidateQueries({ queryKey: ['notes'] });
+      setDeleteModalOpen(false);
     },
     onError: (error: any) => {
-      toast.error(error?.response?.data?.message || error?.response?.data?.error || 'Failed to update settings');
+      toast.error(error?.response?.data?.error || 'Failed to delete notes');
     },
   });
 
-  // Handle profile update
+  // Delete account mutation
+  const deleteAccountMutation = useMutation({
+    mutationFn: async (password: string) => {
+      const response = await api.delete('/auth/account', { data: { password, immediate: true } });
+      return response.data;
+    },
+    onSuccess: (data) => {
+      toast.success(data.message || 'Account deletion initiated');
+      setDeleteModalOpen(false);
+      setTimeout(() => {
+        clearUser();
+        localStorage.removeItem('user');
+        navigate('/auth');
+        toast.info('You have been logged out. Account deletion will complete shortly.');
+      }, 2000);
+    },
+    onError: (error: any) => {
+      toast.error(error?.response?.data?.message || 'Failed to delete account');
+    },
+  });
+
+  // Handlers
   const handleProfileUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     updateProfileMutation.mutate(profileForm);
   };
 
-  // Handle password update
   const handlePasswordUpdate = (e: React.FormEvent) => {
     e.preventDefault();
     if (passwordForm.newPassword !== passwordForm.confirmPassword) {
@@ -168,13 +148,24 @@ export default function Dashboard() {
     updatePasswordMutation.mutate(passwordForm);
   };
 
-  // Handle settings update
-  const handleSettingsUpdate = (e: React.FormEvent) => {
-    e.preventDefault();
-    updateSettingsMutation.mutate(settingsForm);
+  const handleDeleteAllNotes = () => {
+    setDeleteType('notes');
+    setDeleteModalOpen(true);
   };
 
-  // Stats
+  const handleDeleteAccount = () => {
+    setDeleteType('account');
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = async (password?: string) => {
+    if (deleteType === 'notes') {
+      await deleteAllNotesMutation.mutateAsync();
+    } else if (deleteType === 'account' && password) {
+      await deleteAccountMutation.mutateAsync(password);
+    }
+  };
+
   const stats = statsData?.data || {
     totalNotes: 0,
     activeNotes: 0,
@@ -188,8 +179,6 @@ export default function Dashboard() {
       <div className="hidden lg:block">
         <Sidebar />
       </div>
-      
-      {/* Mobile sidebar */}
       {sidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-40">
           <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
@@ -219,7 +208,7 @@ export default function Dashboard() {
               Welcome back, {user?.firstName}!
             </h1>
             <p className="text-gray-600">
-              Manage your profile, settings, and view your note statistics.
+              Manage your profile, security, and view your note statistics.
             </p>
           </div>
 
@@ -282,7 +271,7 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Tabs for different sections */}
+          {/* Tabs */}
           <Tabs defaultValue="profile" className="space-y-6">
             <TabsList className="grid grid-cols-3 lg:grid-cols-3 bg-gray-100">
               <TabsTrigger value="profile" className="flex items-center gap-2 data-[state=active]:bg-white">
@@ -292,7 +281,7 @@ export default function Dashboard() {
               <TabsTrigger value="security" className="flex items-center gap-2 data-[state=active]:bg-white">
                 <Shield className="h-4 w-4" />
                 <span className="hidden lg:inline">Security</span>
-              </TabsTrigger>    
+              </TabsTrigger>
               <TabsTrigger value="account" className="flex items-center gap-2 data-[state=active]:bg-white">
                 <Globe className="h-4 w-4" />
                 <span className="hidden lg:inline">Account</span>
@@ -315,22 +304,18 @@ export default function Dashboard() {
                   <form onSubmit={handleProfileUpdate} className="space-y-4">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">
-                          First Name
-                        </label>
+                        <label className="text-sm font-medium text-gray-700">First Name</label>
                         <Input
                           value={profileForm.firstName}
-                          onChange={(e) => setProfileForm({...profileForm, firstName: e.target.value})}
+                          onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
                           placeholder="Kibet"
                         />
                       </div>
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">
-                          Last Name
-                        </label>
+                        <label className="text-sm font-medium text-gray-700">Last Name</label>
                         <Input
                           value={profileForm.lastName}
-                          onChange={(e) => setProfileForm({...profileForm, lastName: e.target.value})}
+                          onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
                           placeholder="Dennis"
                         />
                       </div>
@@ -343,7 +328,7 @@ export default function Dashboard() {
                       <Input
                         type="email"
                         value={profileForm.emailAddress}
-                        onChange={(e) => setProfileForm({...profileForm, emailAddress: e.target.value})}
+                        onChange={(e) => setProfileForm({ ...profileForm, emailAddress: e.target.value })}
                         placeholder="kibet@example.com"
                       />
                     </div>
@@ -381,35 +366,29 @@ export default function Dashboard() {
                 <CardContent>
                   <form onSubmit={handlePasswordUpdate} className="space-y-4">
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">
-                        Current Password
-                      </label>
+                      <label className="text-sm font-medium text-gray-700">Current Password</label>
                       <Input
                         type="password"
                         value={passwordForm.currentPassword}
-                        onChange={(e) => setPasswordForm({...passwordForm, currentPassword: e.target.value})}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                         placeholder="Enter current password"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">
-                        New Password
-                      </label>
+                      <label className="text-sm font-medium text-gray-700">New Password</label>
                       <Input
                         type="password"
                         value={passwordForm.newPassword}
-                        onChange={(e) => setPasswordForm({...passwordForm, newPassword: e.target.value})}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                         placeholder="Enter new password"
                       />
                     </div>
                     <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700">
-                        Confirm New Password
-                      </label>
+                      <label className="text-sm font-medium text-gray-700">Confirm New Password</label>
                       <Input
                         type="password"
                         value={passwordForm.confirmPassword}
-                        onChange={(e) => setPasswordForm({...passwordForm, confirmPassword: e.target.value})}
+                        onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                         placeholder="Confirm new password"
                       />
                     </div>
@@ -432,74 +411,92 @@ export default function Dashboard() {
               </Card>
             </TabsContent>
 
-            {/* Settings Tab */}
-            
-
             {/* Account Tab */}
-            <TabsContent value="account">
-              <Card className="bg-white border-orange-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-gray-800">
-                    <Globe className="h-5 w-5" />
-                    Account Management
-                  </CardTitle>
-                  <CardDescription className="text-gray-600">
-                    Manage your account and data.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-6">
-                    <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-                      <h3 className="font-medium text-red-800 mb-2">Danger Zone</h3>
-                      <p className="text-sm text-red-600 mb-4">
-                        These actions are irreversible. Please proceed with caution.
-                      </p>
-                      <div className="space-y-3">
-                        <Button
-                          variant="outline"
-                          className="w-full border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800"
-                          onClick={() => {
-                            if (window.confirm('Are you sure you want to delete all your notes? This action cannot be undone.')) {
-                              toast.info('This feature is coming soon');
-                            }
-                          }}
-                        >
-                          Delete All Notes
-                        </Button>
-                        <Button
-                          variant="outline"
-                          className="w-full border-red-300 text-red-700 hover:bg-red-50 hover:text-red-800"
-                          onClick={() => {
-                            if (window.confirm('Are you sure you want to permanently delete your account? All data will be lost.')) {
-                              toast.info('This feature is coming soon');
-                            }
-                          }}
-                        >
-                          Delete Account
-                        </Button>
-                      </div>
-                    </div>
+<TabsContent value="account">
+  <Card className="bg-white border-orange-200">
+    <CardHeader>
+      <CardTitle className="flex items-center gap-2 text-gray-800">
+        <Globe className="h-5 w-5" />
+        Account Management
+      </CardTitle>
+      <CardDescription className="text-gray-600">
+        Manage your account and data.
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-6">
+        {/* Delete All Notes */}
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <Trash2 className="h-5 w-5 text-yellow-600" />
+            <h3 className="font-medium text-yellow-800">Delete All Notes</h3>
+          </div>
+          <p className="text-sm text-yellow-600 mb-4">
+            This will permanently delete ALL your notes. This action cannot be undone.
+          </p>
+          <Button
+            variant="destructive"
+            className="w-full"
+            onClick={handleDeleteAllNotes}
+            disabled={deleteAllNotesMutation.isPending}
+          >
+            {deleteAllNotesMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <Trash2 className="h-4 w-4 mr-2" />
+            )}
+            Delete All Notes
+          </Button>
+        </div>
 
-                    <div className="pt-4">
-                      <Button
-                        variant="outline"
-                        className="w-full border-gray-300 text-gray-700 hover:bg-gray-50"
-                        onClick={() => {
-                          if (window.confirm('Export all your notes as JSON?')) {
-                            toast.info('Export feature coming soon');
-                          }
-                        }}
-                      >
-                        Export All Data
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
+        {/* Delete Account */}
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle className="h-5 w-5 text-red-600" />
+            <h3 className="font-medium text-red-800">Delete Account</h3>
+          </div>
+          <p className="text-sm text-red-600 mb-4">
+            This will permanently delete your account and all associated data. This action cannot be undone.
+          </p>
+          <Button
+            variant="destructive"
+            className="w-full"
+            onClick={handleDeleteAccount}
+            disabled={deleteAccountMutation.isPending}
+          >
+            {deleteAccountMutation.isPending ? (
+              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+            ) : (
+              <AlertTriangle className="h-4 w-4 mr-2" />
+            )}
+            Delete Account
+          </Button>
+        </div>
+      </div>
+    </CardContent>
+  </Card>
+</TabsContent>
+
           </Tabs>
         </main>
       </div>
+
+      {/* Delete Confirmation Modal */}
+      <DeleteConfirmationModal
+        isOpen={deleteModalOpen}
+        onClose={() => setDeleteModalOpen(false)}
+        onConfirm={handleConfirmDelete}
+        title={deleteType === 'account' ? 'Delete Account' : 'Delete All Notes'}
+        description={
+          deleteType === 'account'
+            ? 'This will permanently delete your account and all associated data. This action cannot be undone.'
+            : 'This will permanently delete ALL your notes. This action cannot be undone.'
+        }
+        type={deleteType}
+        isPending={
+          deleteType === 'account' ? deleteAccountMutation.isPending : deleteAllNotesMutation.isPending
+        }
+      />
     </div>
   );
 }
