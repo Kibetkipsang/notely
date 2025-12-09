@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // Add AvatarImage
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +11,7 @@ import {
 import useAuthStore from '../stores/useAuthStore';
 import { 
   PenLine, Trash2, User, LogOut, Bell, Settings, FileText, 
-  Star, Pin, Clock, CheckCircle, Info
+  Star, Pin, Clock, CheckCircle, Info, Mail
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -44,6 +44,18 @@ type ActivitiesResponse = {
     pages: number;
     hasNextPage: boolean;
     hasPreviousPage: boolean;
+  };
+};
+
+type UserProfileResponse = {
+  success: boolean;
+  data: {
+    id: string;
+    firstName: string;
+    lastName: string;
+    emailAddress: string;
+    avatarUrl?: string;
+    createdAt: string;
   };
 };
 
@@ -104,6 +116,47 @@ export const Header = () => {
     staleTime: 60000, // 1 minute
   });
 
+  // 🔴 NEW: Fetch user profile for avatar
+  const { data: userProfile, refetch: refetchUserProfile } = useQuery<UserProfileResponse>({
+    queryKey: ['user-profile-header', user?.id],
+    queryFn: async () => {
+      if (!user?.id) {
+        return {
+          success: false,
+          data: {
+            id: '',
+            firstName: '',
+            lastName: '',
+            emailAddress: '',
+            createdAt: new Date().toISOString()
+          }
+        };
+      }
+      
+      try {
+        const response = await api.get('/auth/profile');
+        return response.data;
+      } catch (error: any) {
+        console.error('Error fetching user profile:', error);
+        return {
+          success: false,
+          data: {
+            id: user.id,
+            firstName: user.firstName || '',
+            lastName: user.lastName || '',
+            emailAddress: user.emailAddress || '',
+            avatarUrl: user.avatarUrl,
+            createdAt: new Date().toISOString()
+          }
+        };
+      }
+    },
+    enabled: !!user?.id,
+    retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 300000, // 5 minutes
+  });
+
   // 🔴 FIXED: Safe mutation for marking all as read
   const markAllAsReadMutation = useMutation({
     mutationFn: async () => {
@@ -122,14 +175,14 @@ export const Header = () => {
     },
     onError: (error: any) => {
       console.error('Error marking all as read:', error);
-      // 🚨 Don't show toast for 401 - user might be logged out
+      // Don't show toast for 401 - user might be logged out
       if (error.response?.status !== 401) {
         toast.error(error?.response?.data?.message || 'Failed to mark all as read');
       }
     }
   });
 
-  // 🔴 FIXED: Safe mutation for marking single activity as read
+  //  FIXED: Safe mutation for marking single activity as read
   const markAsReadMutation = useMutation({
     mutationFn: async (activityId: string) => {
       const response = await api.patch(`/activities/${activityId}/read`);
@@ -165,11 +218,12 @@ export const Header = () => {
   }, [activitiesResponse]);
 
   const getInitials = () => {
-    if (user?.firstName && user?.lastName) {
-      return `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase();
+    const currentUser = userProfile?.data || user;
+    if (currentUser?.firstName && currentUser?.lastName) {
+      return `${currentUser.firstName.charAt(0)}${currentUser.lastName.charAt(0)}`.toUpperCase();
     }
-    if (user?.emailAddress) {
-      return user.emailAddress.charAt(0).toUpperCase();
+    if (currentUser?.emailAddress) {
+      return currentUser.emailAddress.charAt(0).toUpperCase();
     }
     return 'U';
   };
@@ -246,6 +300,7 @@ export const Header = () => {
     if (open && user?.id) {
       // Refetch when dropdown opens to get latest data
       refetchActivities();
+      refetchUserProfile(); // Also refetch user profile for updated avatar
     }
   };
 
@@ -276,6 +331,13 @@ export const Header = () => {
 
   const unreadCount = localUnreadCount;
   const hasActivities = localActivities.length > 0;
+  
+  // Get current user data with avatar
+  const currentUser = userProfile?.data || user;
+  const userAvatarUrl = currentUser?.avatarUrl;
+  const userFirstName = currentUser?.firstName || 'User';
+  const userLastName = currentUser?.lastName || '';
+  const userEmail = currentUser?.emailAddress || '';
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-gray-200 bg-white/95 backdrop-blur-sm supports-[backdrop-filter]:bg-white/60">
@@ -474,7 +536,14 @@ export const Header = () => {
                   size="icon" 
                   className="rounded-full hover:bg-orange-50 border border-orange-100 transition-all"
                 >
-                  <Avatar className="h-9 w-9">
+                  <Avatar className="h-9 w-9 ring-2 ring-orange-100 ring-offset-1">
+                    {userAvatarUrl ? (
+                      <AvatarImage 
+                        src={userAvatarUrl} 
+                        alt={`${userFirstName} ${userLastName}`}
+                        className="object-cover"
+                      />
+                    ) : null}
                     <AvatarFallback className="bg-gradient-to-r from-orange-400 to-orange-500 text-white font-semibold shadow-sm">
                       {getInitials()}
                     </AvatarFallback>
@@ -485,17 +554,25 @@ export const Header = () => {
               <DropdownMenuContent align="end" className="w-64 bg-white border-orange-200 shadow-lg animate-in slide-in-from-top-2 duration-200">
                 {/* User Info */}
                 <div className="flex items-center gap-3 p-4">
-                  <Avatar className="h-12 w-12 border-2 border-orange-100">
-                    <AvatarFallback className="bg-gradient-to-r from-orange-400 to-orange-500 text-white text-lg">
+                  <Avatar className="h-12 w-12 border-2 border-orange-100 ring-1 ring-orange-50">
+                    {userAvatarUrl ? (
+                      <AvatarImage 
+                        src={userAvatarUrl} 
+                        alt={`${userFirstName} ${userLastName}`}
+                        className="object-cover"
+                      />
+                    ) : null}
+                    <AvatarFallback className="bg-gradient-to-r from-orange-400 to-orange-500 text-white text-lg font-semibold">
                       {getInitials()}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex flex-col overflow-hidden">
                     <p className="text-sm font-semibold text-gray-900 truncate">
-                      {user?.firstName} {user?.lastName}
+                      {userFirstName} {userLastName}
                     </p>
-                    <p className="text-xs text-gray-500 truncate">
-                      {user?.emailAddress}
+                    <p className="text-xs text-gray-500 truncate flex items-center">
+                      <Mail className="h-3 w-3 mr-1 flex-shrink-0" />
+                      {userEmail}
                     </p>
                     {unreadCount > 0 && (
                       <div className="mt-1 flex items-center gap-2">
@@ -515,7 +592,7 @@ export const Header = () => {
                   onClick={() => navigate('/dashboard')}
                   className="cursor-pointer text-gray-700 hover:text-orange-500 hover:bg-orange-50 focus:text-orange-500 focus:bg-orange-50"
                 >
-                  <User className="mr-2 h-4 w-4" />
+                  <PenLine className="mr-2 h-4 w-4" />
                   <span>Dashboard</span>
                 </DropdownMenuItem>
                 
@@ -524,7 +601,7 @@ export const Header = () => {
                   className="cursor-pointer text-gray-700 hover:text-orange-500 hover:bg-orange-50 focus:text-orange-500 focus:bg-orange-50"
                 >
                   <User className="mr-2 h-4 w-4" />
-                  <span>Profile</span>
+                  <span>Profile & Avatar</span>
                 </DropdownMenuItem>
                 
                 <DropdownMenuItem 

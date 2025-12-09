@@ -5,11 +5,13 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../axios';
 import useAuthStore from '../../stores/useAuthStore';
 import Sidebar from './SideBar';
+import AvatarUpload from './Avatar'; // Add this import
 import { DeleteConfirmationModal } from './DeleteModal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator'; // Add this
 import { toast } from 'sonner';
 import {
   User,
@@ -25,7 +27,9 @@ import {
   Calendar,
   AlertTriangle,
   Trash2,
-  Settings
+  Settings,
+  Image,
+  UserCircle
 } from 'lucide-react';
 
 export default function Dashboard() {
@@ -43,6 +47,14 @@ export default function Dashboard() {
     queryKey: ['user-stats'],
     queryFn: async () => (await api.get('/notes/stats')).data,
     enabled: !!user,
+  });
+
+  // Fetch user profile data (for avatar)
+  const { data: userProfile, refetch: refetchUserProfile } = useQuery({
+    queryKey: ['user-profile'],
+    queryFn: async () => (await api.get('/auth/profile')).data,
+    enabled: !!user,
+    initialData: { data: user }, // Use existing user data as initial
   });
 
   // Profile form state
@@ -75,7 +87,9 @@ export default function Dashboard() {
     mutationFn: async (data: any) => (await api.put('/auth/profile', data)).data,
     onSuccess: (data) => {
       setUser(data.user);
+      refetchUserProfile(); // Refetch to get updated avatar
       toast.success('Profile updated successfully');
+      navigate("/auth")
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to update profile');
@@ -93,6 +107,21 @@ export default function Dashboard() {
       toast.error(error?.response?.data?.message || 'Failed to update password');
     },
   });
+
+  // Avatar update handler
+  const handleAvatarUpdate = (newAvatarUrl: string) => {
+    // Update user in auth store
+    if (user) {
+      const updatedUser = { ...user, avatarUrl: newAvatarUrl };
+      setUser(updatedUser);
+    }
+    
+    // Invalidate user profile query to fetch fresh data
+    queryClient.invalidateQueries({ queryKey: ['user-profile'] });
+    
+    // Show success toast
+    toast.success('Avatar updated successfully');
+  };
 
   // Delete all notes mutation
   const deleteAllNotesMutation = useMutation({
@@ -173,6 +202,8 @@ export default function Dashboard() {
     recentNotes: 0,
   };
 
+  const currentUserData = userProfile?.data || user;
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-white to-orange-50 flex">
       {/* Sidebar */}
@@ -204,12 +235,21 @@ export default function Dashboard() {
         <main className="p-4 lg:p-8">
           {/* Welcome header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">
-              Welcome back, {user?.firstName}!
-            </h1>
-            <p className="text-gray-600">
-              Manage your profile, security, and view your note statistics.
-            </p>
+            <div className="flex items-center gap-4 mb-4">
+              <div className="relative">
+                
+               
+                
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-800">
+                  Welcome back, {user?.firstName}!
+                </h1>
+                <p className="text-gray-600">
+                  Manage your profile, security, and view your note statistics.
+                </p>
+              </div>
+            </div>
           </div>
 
           {/* Stats cards */}
@@ -290,65 +330,111 @@ export default function Dashboard() {
 
             {/* Profile Tab */}
             <TabsContent value="profile">
-              <Card className="bg-white border-orange-200">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-gray-800">
-                    <User className="h-5 w-5" />
-                    Profile Information
-                  </CardTitle>
-                  <CardDescription className="text-gray-600">
-                    Update your personal information and profile details.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleProfileUpdate} className="space-y-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">First Name</label>
-                        <Input
-                          value={profileForm.firstName}
-                          onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
-                          placeholder="Kibet"
-                        />
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Left Column - Avatar */}
+                <Card className="bg-white border-orange-200 lg:col-span-1">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-gray-800">
+                      <Image className="h-5 w-5" />
+                      Profile Picture
+                    </CardTitle>
+                    <CardDescription className="text-gray-600">
+                      Upload or change your avatar
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <AvatarUpload
+                      currentAvatar={currentUserData?.avatarUrl}
+                      onAvatarUpdate={handleAvatarUpdate}
+                    />
+                    <Separator className="my-6" />
+                    <div className="text-xs text-gray-500 space-y-1">
+                      <p className="flex items-center gap-2">
+                        <User className="h-3 w-3" />
+                        Joined: {new Date(currentUserData?.createdAt || Date.now()).toLocaleDateString()}
+                      </p>
+                      <p className="flex items-center gap-2">
+                        <FileText className="h-3 w-3" />
+                        Notes: {stats.totalNotes}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Right Column - Profile Information */}
+                <Card className="bg-white border-orange-200 lg:col-span-2">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-gray-800">
+                      <User className="h-5 w-5" />
+                      Profile Information
+                    </CardTitle>
+                    <CardDescription className="text-gray-600">
+                      Update your personal information and contact details.
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <form onSubmit={handleProfileUpdate} className="space-y-6">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                            <User className="h-4 w-4" />
+                            First Name
+                          </label>
+                          <Input
+                            value={profileForm.firstName}
+                            onChange={(e) => setProfileForm({ ...profileForm, firstName: e.target.value })}
+                            placeholder="Enter your first name"
+                            className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium text-gray-700">Last Name</label>
+                          <Input
+                            value={profileForm.lastName}
+                            onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
+                            placeholder="Enter your last name"
+                            className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
+                          />
+                        </div>
                       </div>
+                      
                       <div className="space-y-2">
-                        <label className="text-sm font-medium text-gray-700">Last Name</label>
+                        <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
+                          <Mail className="h-4 w-4" />
+                          Email Address
+                        </label>
                         <Input
-                          value={profileForm.lastName}
-                          onChange={(e) => setProfileForm({ ...profileForm, lastName: e.target.value })}
-                          placeholder="Dennis"
+                          type="email"
+                          value={profileForm.emailAddress}
+                          onChange={(e) => setProfileForm({ ...profileForm, emailAddress: e.target.value })}
+                          placeholder="your.email@example.com"
+                          className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                         />
+                        <p className="text-xs text-gray-500">
+                          Your email is used for account notifications and login
+                        </p>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium text-gray-700 flex items-center gap-2">
-                        <Mail className="h-4 w-4" />
-                        Email Address
-                      </label>
-                      <Input
-                        type="email"
-                        value={profileForm.emailAddress}
-                        onChange={(e) => setProfileForm({ ...profileForm, emailAddress: e.target.value })}
-                        placeholder="kibet@example.com"
-                      />
-                    </div>
-                    <div className="pt-4">
-                      <Button
-                        type="submit"
-                        disabled={updateProfileMutation.isPending}
-                        className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
-                      >
-                        {updateProfileMutation.isPending ? (
-                          <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                        ) : (
-                          <Save className="h-4 w-4 mr-2" />
-                        )}
-                        Save Changes
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
+
+                      <Separator />
+
+                      <div className="flex justify-end">
+                        <Button
+                          type="submit"
+                          disabled={updateProfileMutation.isPending}
+                          className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white"
+                        >
+                          {updateProfileMutation.isPending ? (
+                            <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                          ) : (
+                            <Save className="h-4 w-4 mr-2" />
+                          )}
+                          Save Profile Changes
+                        </Button>
+                      </div>
+                    </form>
+                  </CardContent>
+                </Card>
+              </div>
             </TabsContent>
 
             {/* Security Tab */}
@@ -372,6 +458,7 @@ export default function Dashboard() {
                         value={passwordForm.currentPassword}
                         onChange={(e) => setPasswordForm({ ...passwordForm, currentPassword: e.target.value })}
                         placeholder="Enter current password"
+                        className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                       />
                     </div>
                     <div className="space-y-2">
@@ -381,7 +468,11 @@ export default function Dashboard() {
                         value={passwordForm.newPassword}
                         onChange={(e) => setPasswordForm({ ...passwordForm, newPassword: e.target.value })}
                         placeholder="Enter new password"
+                        className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                       />
+                      <p className="text-xs text-gray-500">
+                        Password must be at least 6 characters long
+                      </p>
                     </div>
                     <div className="space-y-2">
                       <label className="text-sm font-medium text-gray-700">Confirm New Password</label>
@@ -390,6 +481,7 @@ export default function Dashboard() {
                         value={passwordForm.confirmPassword}
                         onChange={(e) => setPasswordForm({ ...passwordForm, confirmPassword: e.target.value })}
                         placeholder="Confirm new password"
+                        className="border-gray-300 focus:border-orange-500 focus:ring-orange-500"
                       />
                     </div>
                     <div className="pt-4">
@@ -412,71 +504,89 @@ export default function Dashboard() {
             </TabsContent>
 
             {/* Account Tab */}
-<TabsContent value="account">
-  <Card className="bg-white border-orange-200">
-    <CardHeader>
-      <CardTitle className="flex items-center gap-2 text-gray-800">
-        <Globe className="h-5 w-5" />
-        Account Management
-      </CardTitle>
-      <CardDescription className="text-gray-600">
-        Manage your account and data.
-      </CardDescription>
-    </CardHeader>
-    <CardContent>
-      <div className="space-y-6">
-        {/* Delete All Notes */}
-        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <Trash2 className="h-5 w-5 text-yellow-600" />
-            <h3 className="font-medium text-yellow-800">Delete All Notes</h3>
-          </div>
-          <p className="text-sm text-yellow-600 mb-4">
-            This will permanently delete ALL your notes. This action cannot be undone.
-          </p>
-          <Button
-            variant="destructive"
-            className="w-full"
-            onClick={handleDeleteAllNotes}
-            disabled={deleteAllNotesMutation.isPending}
-          >
-            {deleteAllNotesMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <Trash2 className="h-4 w-4 mr-2" />
-            )}
-            Delete All Notes
-          </Button>
-        </div>
+            <TabsContent value="account">
+              <Card className="bg-white border-orange-200">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2 text-gray-800">
+                    <Globe className="h-5 w-5" />
+                    Account Management
+                  </CardTitle>
+                  <CardDescription className="text-gray-600">
+                    Manage your account and data.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-6">
+                    {/* Data Management */}
+                    <div className="space-y-4">
+                      <h3 className="font-medium text-gray-800 flex items-center gap-2">
+                        <FileText className="h-5 w-5" />
+                        Data Management
+                      </h3>
+                      <div className="p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h4 className="font-medium text-gray-800">Delete All Notes</h4>
+                            <p className="text-sm text-gray-600">
+                              Permanently delete all your notes. This action cannot be undone.
+                            </p>
+                          </div>
+                          <Button
+                            variant="outline"
+                            className="border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700"
+                            onClick={handleDeleteAllNotes}
+                            disabled={deleteAllNotesMutation.isPending}
+                          >
+                            {deleteAllNotesMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <Trash2 className="h-4 w-4 mr-2" />
+                            )}
+                            Delete All Notes
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
 
-        {/* Delete Account */}
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
-          <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle className="h-5 w-5 text-red-600" />
-            <h3 className="font-medium text-red-800">Delete Account</h3>
-          </div>
-          <p className="text-sm text-red-600 mb-4">
-            This will permanently delete your account and all associated data. This action cannot be undone.
-          </p>
-          <Button
-            variant="destructive"
-            className="w-full"
-            onClick={handleDeleteAccount}
-            disabled={deleteAccountMutation.isPending}
-          >
-            {deleteAccountMutation.isPending ? (
-              <Loader2 className="h-4 w-4 animate-spin mr-2" />
-            ) : (
-              <AlertTriangle className="h-4 w-4 mr-2" />
-            )}
-            Delete Account
-          </Button>
-        </div>
-      </div>
-    </CardContent>
-  </Card>
-</TabsContent>
+                    <Separator />
 
+                    {/* Danger Zone */}
+                    <div className="space-y-4">
+                      <h3 className="font-medium text-red-800 flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5" />
+                        Danger Zone
+                      </h3>
+                      <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+                        <div className="space-y-2">
+                          <h4 className="font-medium text-red-800">Delete Account</h4>
+                          <p className="text-sm text-red-600">
+                            This will permanently delete your account and all associated data including notes, activities, and profile information.
+                          </p>
+                          <p className="text-sm text-red-600 font-medium">
+                            ⚠️ This action cannot be undone.
+                          </p>
+                        </div>
+                        <div className="mt-4">
+                          <Button
+                            variant="destructive"
+                            className="w-full"
+                            onClick={handleDeleteAccount}
+                            disabled={deleteAccountMutation.isPending}
+                          >
+                            {deleteAccountMutation.isPending ? (
+                              <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                            ) : (
+                              <AlertTriangle className="h-4 w-4 mr-2" />
+                            )}
+                            Delete Account
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
           </Tabs>
         </main>
       </div>

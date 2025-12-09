@@ -10,8 +10,7 @@ declare global {
         userName: string;
         emailAddress: string;
       };
-      file?: Express.Multer.File;      // single file
-      files?: Express.Multer.File[];   // multiple files
+   
     }
   }
 }

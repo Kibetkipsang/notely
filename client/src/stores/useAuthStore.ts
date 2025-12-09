@@ -8,6 +8,7 @@ type UserType = {
   userName: string;
   emailAddress: string;
   role: string;
+  avatarUrl?: string; // Add this optional property
 };
 
 type AuthStore = {
