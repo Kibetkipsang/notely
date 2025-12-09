@@ -94,7 +94,7 @@ app.delete('/activities/:id', authenticate, deleteActivity);
 app.delete('/activities', authenticate, clearAllActivities);
 
 // Health check endpoint
-app.get('/health', (req, res) => {
+app.get('/health', (_req, res) => {
   res.status(200).json({
     status: 'OK',
     message: 'Server is running',
@@ -112,7 +112,7 @@ app.use('*', (req, res) => {
 });
 
 // Error handling middleware
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+app.use((err: any, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
   console.error('Server error:', err);
   res.status(500).json({
     success: false,

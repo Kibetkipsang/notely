@@ -18,12 +18,17 @@ model User {
   id           String   @id @default(uuid()) @db.UniqueIdentifier
   firstName    String   @db.VarChar(100)
   lastName     String   @db.VarChar(100)
-  userName     String?  @unique @db.VarChar(50)
+  userName     String  @unique @db.VarChar(50)
   emailAddress String   @unique @db.VarChar(255)
-  password String   @map("password") @db.VarChar(255) 
+  password     String   @map("password") @db.VarChar(255) 
   avatarUrl    String?  @db.NVarChar(Max)
   createdAt    DateTime @default(now()) @db.DateTimeOffset
   updatedAt    DateTime @default(now()) @db.DateTimeOffset
+  
+  // account deletion
+  isDeleted    Boolean  @default(false) @map("is_deleted")
+  deletedAt    DateTime? @map("deleted_at") @db.DateTimeOffset
+  scheduledForDeletion DateTime? @map("scheduled_for_deletion") @db.DateTimeOffset
   
   // password reset functionality
   passwordResetToken      String?   @map("password_reset_token") @db.VarChar(255)
@@ -48,6 +53,9 @@ model User {
   @@index([lastName, firstName])
   @@index([passwordResetToken])
   @@index([emailVerificationToken])
+  @@index([isDeleted])
+  @@index([scheduledForDeletion])
+  @@index([isDeleted, deletedAt])
 }
 
 model Note {

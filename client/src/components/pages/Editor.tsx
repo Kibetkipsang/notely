@@ -232,6 +232,7 @@ export default function Editor() {
                 </Label>
                 <Textarea
                   id="content"
+                  spellCheck='true'
                   placeholder="Write your note content here..."
                   value={content}
                   onChange={(e) => setContent(e.target.value)}

@@ -605,3 +605,95 @@ export const deleteAccount = async (req: Request, res: Response): Promise<void> 
     });
   }
 };
+
+
+
+// Cancel scheduled deletion
+export const cancelAccountDeletion = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'Unauthorized - No user ID found',
+      });
+      return;
+    }
+
+    const user = await client.user.findUnique({
+      where: { id: userId, isDeleted: false },
+    });
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+      return;
+    }
+
+    await client.user.update({
+      where: { id: userId },
+      data: {
+        scheduledForDeletion: null,
+        updatedAt: new Date(),
+      },
+    });
+
+    res.status(200).json({
+      success: true,
+      message: 'Account deletion cancelled',
+    });
+  } catch (error) {
+    console.error('Cancel deletion error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to cancel account deletion',
+    });
+  }
+};
+
+// Get account deletion status
+export const getAccountDeletionStatus = async (req: Request, res: Response): Promise<void> => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      res.status(401).json({
+        success: false,
+        message: 'Unauthorized - No user ID found',
+      });
+      return;
+    }
+
+    const user = await client.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        isDeleted: true,
+        deletedAt: true,
+        scheduledForDeletion: true,
+      },
+    });
+
+    if (!user) {
+      res.status(404).json({
+        success: false,
+        message: 'User not found',
+      });
+      return;
+    }
+
+    res.status(200).json({
+      success: true,
+      data: user,
+    });
+  } catch (error) {
+    console.error('Get deletion status error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to get account deletion status',
+    });
+  }
+};
