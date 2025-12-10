@@ -34,7 +34,7 @@ import {
 } from './controllers/activities';
 import { getUserProfile, updatePassword, updateUserProfile, updateUserSettings,getUserSettings, deleteAccount } from './controllers/auth';
 import { authenticate } from './middlewares/checkUser'
-import { upload, uploadAvatar } from './controllers/users';
+import { upload, uploadAvatar, deleteAvatar } from './controllers/users';
 
 
 dotenv.config();
@@ -69,6 +69,7 @@ app.get('/auth/settings', authenticate, getUserSettings);
 app.put('/auth/settings', authenticate, updateUserSettings);
 app.delete('/auth/account', authenticate, deleteAccount);
 app.post('/avatar', authenticate, upload.single('avatar'), uploadAvatar);
+app.delete('/avatar', authenticate, deleteAvatar);
 
 // Notes routes
 app.post('/notes/create', authenticate, createNote); 

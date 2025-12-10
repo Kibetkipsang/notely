@@ -8,13 +8,14 @@ type UserType = {
   userName: string;
   emailAddress: string;
   role: string;
-  avatarUrl?: string; // Add this optional property
+  avatarUrl?: string;
 };
 
 type AuthStore = {
   user: UserType | null;
   token: string | null;
   setUser: (user: UserType, token?: string) => void;
+  updateUser: (updates: Partial<UserType>) => void; // Add this
   clearUser: () => void;
 };
 
@@ -27,23 +28,27 @@ const useAuthStore = create<AuthStore>()(
       setUser: (user, token) => {
         if (token) {
           set({ user, token });
-          // Only store token in localStorage here
           localStorage.setItem('token', token);
         } else {
           set({ user });
         }
       },
       
+      // Add this method to update user fields
+      updateUser: (updates) => {
+        set((state) => ({
+          user: state.user ? { ...state.user, ...updates } : null
+        }));
+      },
+      
       clearUser: () => {
         set({ user: null, token: null });
         localStorage.removeItem('token');
-        localStorage.removeItem('auth-storage'); // Clear Zustand's persisted state too
+        localStorage.removeItem('auth-storage');
       },
     }),
     {
       name: 'auth-storage',
-      // Optional: Exclude token from persistence since we're storing it separately
-      // partialize: (state) => ({ user: state.user })
     }
   )
 );
