@@ -82,8 +82,8 @@ export default function Sidebar({ isOpen = true, onClose }: SidebarProps) {
     {
       name: 'Settings',
       icon: <Settings className="h-5 w-5" />,
-      path: '/settings',
-      active: location.pathname === '/settings',
+      path: '/dashboard',
+      active: location.pathname === '/dashboard',
     },
   ];
 
