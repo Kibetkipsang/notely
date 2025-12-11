@@ -145,7 +145,7 @@ export default function Editor() {
     onSuccess: () => {
       toast.success('Note created successfully!');
       queryClient.invalidateQueries({ queryKey: ['notes'] });
-      navigate('/dashboard');
+      navigate('/notes');
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to create note');
@@ -162,7 +162,7 @@ export default function Editor() {
       toast.success('Note updated successfully!');
       queryClient.invalidateQueries({ queryKey: ['notes'] });
       queryClient.setQueryData(['note', id], data);
-      navigate('/dashboard');
+      navigate('/notes');
     },
     onError: (error: any) => {
       toast.error(error?.response?.data?.message || 'Failed to update note');
