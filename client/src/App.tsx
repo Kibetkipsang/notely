@@ -1,6 +1,6 @@
 import { Routes, Route } from 'react-router-dom'
 import { Header } from './components/Header'
-
+import Footer from './components/Footer'
 import Auth from './components/Auth'
 import Landing from './components/Home'
 import Dashboard from './components/pages/Dashboard'
@@ -32,6 +32,7 @@ function App() {
           <Route path='/pinned' element={<Pinned />} />
           <Route path='/bookmarks' element={<Bookmarks />} />
         </Routes>
+        <Footer />
     
     </>
   )

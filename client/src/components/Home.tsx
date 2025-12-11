@@ -8,11 +8,7 @@ export default function Landing() {
   const navigate = useNavigate();
   const { user } = useAuthStore();
 
-  useEffect(() => {
-    if (user) {
-      navigate('/dashboard');
-    }
-  }, [user, navigate]);
+
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white to-orange-50">
@@ -21,7 +17,7 @@ export default function Landing() {
         <div className="max-w-4xl mx-auto text-center space-y-10">
           {/* Tagline */}
           <div className="inline-flex items-center gap-2 px-6 py-3 rounded-full bg-gradient-to-r from-orange-100 to-amber-100 border border-orange-200 text-sm font-medium text-orange-700 shadow-sm animate-fade-in">
-            <Sparkles className="h-4 w-4" />
+            
             Beautiful notes, organized effortlessly
           </div>
 

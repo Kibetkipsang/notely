@@ -12,6 +12,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@prisma/client": "^6.6.0",
     "bcrypt": "^6.0.0",
     "cloudinary": "^2.8.0",
@@ -20,9 +21,11 @@
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^4.18.2",
+    "groq-sdk": "^0.37.0",
     "install": "^0.13.0",
     "jsonwebtoken": "^9.0.2",
     "multer": "^2.0.2",
+    "openai": "^6.10.0",
     "prisma": "^6.6.0",
     "uuid": "^13.0.0",
     "zxcvbn": "^4.4.2"

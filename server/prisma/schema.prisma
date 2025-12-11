@@ -18,7 +18,7 @@ model User {
   id           String   @id @default(uuid()) @db.UniqueIdentifier
   firstName    String   @db.VarChar(100)
   lastName     String   @db.VarChar(100)
-  userName     String  @unique @db.VarChar(50)
+  userName     String   @unique @db.VarChar(50)
   emailAddress String   @unique @db.VarChar(255)
   password     String   @map("password") @db.VarChar(255) 
   avatarUrl    String?  @db.NVarChar(Max)
@@ -45,7 +45,9 @@ model User {
   // Relations
   notes Note[]
   settings UserSettings?
-  activities Activity[] // Add this
+  activities Activity[]
+  aiChats AIChat[]      // Add this for AI relation
+  aiUsage AIUsage[]     // Add this for AI relation
   
   @@map("Users")
   @@index([emailAddress])
@@ -147,4 +149,49 @@ model Activity {
   @@index([userId, createdAt])
   @@index([type])
   @@index([targetType, targetId])
+}
+
+model AIChat {
+  id          String    @id @default(uuid()) @db.UniqueIdentifier
+  userId      String    @map("user_id") @db.UniqueIdentifier
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String?   @db.NVarChar(255)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.DateTimeOffset
+  updatedAt   DateTime  @updatedAt @map("updated_at") @db.DateTimeOffset
+  
+  messages    AIMessage[]
+  
+  @@map("AIChats")
+  @@index([userId])
+  @@index([userId, createdAt])
+}
+
+model AIMessage {
+  id          String   @id @default(uuid()) @db.UniqueIdentifier
+  chatId      String   @map("chat_id") @db.UniqueIdentifier
+  chat        AIChat   @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  role        String   @db.VarChar(20)  // 'user' or 'assistant'
+  content     String   @db.NVarChar(Max)
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTimeOffset
+  
+  @@map("AIMessages")
+  @@index([chatId])
+  @@index([chatId, createdAt])
+  @@index([role])
+}
+
+model AIUsage {
+  id          String   @id @default(uuid()) @db.UniqueIdentifier
+  userId      String   @map("user_id") @db.UniqueIdentifier
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint    String   @db.VarChar(100)  // 'generate', 'chat', 'summarize', 'tags'
+  tokens      Int
+  cost        Decimal  @db.Decimal(10, 4)  // Changed from Float to Decimal
+  metadata    String?  @db.NVarChar(Max)  // JSON metadata
+  createdAt   DateTime @default(now()) @map("created_at") @db.DateTimeOffset
+  
+  @@map("AIUsage")
+  @@index([userId])
+  @@index([userId, createdAt])
+  @@index([endpoint])
 }

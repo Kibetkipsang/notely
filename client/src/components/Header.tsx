@@ -1,6 +1,6 @@
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; // Add AvatarImage
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'; 
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,7 +11,7 @@ import {
 import useAuthStore from '../stores/useAuthStore';
 import { 
   PenLine, Trash2, User, LogOut, Bell, Settings, FileText, 
-  Star, Pin, Clock, CheckCircle, Info, Mail
+  Star, House, Pin, Clock, CheckCircle, Info, Mail
 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useQuery, useMutation } from '@tanstack/react-query';
@@ -356,6 +356,15 @@ export const Header = () => {
           {/* Desktop Navigation - only show if user is logged in */}
           {user && (
             <>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => navigate('/')}
+                className="hidden sm:flex text-gray-700 hover:text-orange-500 hover:bg-orange-50"
+              >
+                <House className="mr-2 h-4 w-4" />
+                Home
+              </Button>
               <Button
                 variant="ghost"
                 size="sm"

@@ -32,6 +32,16 @@ import {
   deleteActivity,
   clearAllActivities,
 } from './controllers/activities';
+import {
+  generateNoteContent,
+  chatWithAI,
+  getUserChats,
+  getChatHistory,
+  deleteChat,
+  summarizeNotes,
+  generateTags,
+  getAIUsageStats
+} from './controllers/ai';
 import { getUserProfile, updatePassword, updateUserProfile, updateUserSettings,getUserSettings, deleteAccount } from './controllers/auth';
 import { authenticate } from './middlewares/checkUser'
 import { upload, uploadAvatar, deleteAvatar } from './controllers/users';
@@ -99,6 +109,22 @@ app.patch('/activities/:id/read', authenticate, markActivityAsRead);
 app.patch('/activities/read-all', authenticate, markAllActivitiesAsRead);
 app.delete('/activities/:id', authenticate, deleteActivity);
 app.delete('/activities', authenticate, clearAllActivities);
+
+// AI Writing Assistant
+app.post('/ai/generate', authenticate, generateNoteContent);
+
+// AI Chat Assistant
+app.post('/ai/chat', authenticate, chatWithAI);
+app.get('/ai/chats', authenticate, getUserChats);
+app.get('/ai/chats/:chatId', authenticate, getChatHistory);
+app.delete('/ai/chats/:chatId', authenticate, deleteChat);
+
+// AI Note Tools
+app.post('/ai/summarize', authenticate, summarizeNotes);
+app.post('/ai/tags', authenticate, generateTags);
+
+// AI Usage Statistics
+app.get('/ai/usage', authenticate, getAIUsageStats);
 
 // Health check endpoint
 app.get('/health', (_req, res) => {
